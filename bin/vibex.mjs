@@ -9,6 +9,8 @@ import { buildGraph, specId } from '../renderers/docs/graph.mjs';
 import { checkAnchor } from '../renderers/docs/anchors.mjs';
 import { toMarkdown } from '../renderers/docs/to-markdown.mjs';
 import { head, dirtyPaths, changedSince, shortSha, prefix as gitPrefix, underPrefix } from '../renderers/docs/git.mjs';
+import { readCommits, buildChangelog, resolve as resolveRef, diffClaims } from '../renderers/changelog/from-git.mjs';
+import { changelogToMarkdown } from '../renderers/changelog/to-markdown.mjs';
 import { planCheck, mergeLock, verifiedCommits, emptyLock } from '../renderers/docs/incremental.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,6 +34,10 @@ Usage:
                                   each with provenance and a computed confidence.
                                   Uses git to re-read only the anchors whose files moved
                                   since the commit recorded in the lock file.
+  vibex changelog [<from>..<to>] [-o changelog.json] [--md CHANGES.md] [--specs <dir>]
+                  [--repo <dir>] [--title "..."] [--merges] [--json]
+                                  build a release list from commit history, and — with
+                                  --specs — what those commits did to the documentation
   vibex demo [out-dir]          render the bundled examples (+ dashboard.html)
   vibex types                   list diagram types and schema paths
   vibex help                    this text
@@ -155,6 +161,99 @@ function checkAnchorsIncremental(docsSpec, repoRoot, lockPath) {
   for (const [id, prev] of plan.reuse) status.set(id, { ...prev, reused: true });
 
   return { status, commit, lock, plan, nextLock: mergeLock({ claims: docsSpec.claims, lock, statuses: status, commit }) };
+}
+
+// Reads the docs specs as they stood at a ref, so a release can say what it did
+// to the documentation and not only to the code.
+function claimsAt(run, ref, dir) {
+  const listing = run(['ls-tree', '-r', '--name-only', ref, '--', dir]);
+  if (listing === null) return null;
+  const specs = new Map();
+  const docs = [];
+  for (const file of listing.split('\n').map((l) => l.trim()).filter((l) => l.endsWith('.json'))) {
+    const text = run(['show', `${ref}:${file}`]);
+    if (text === null) continue;
+    let spec;
+    try { spec = JSON.parse(text); } catch { continue; }
+    if (!spec?.diagram_type || !validateSpec(spec).ok) continue;
+    if (spec.diagram_type === 'docs') docs.push(spec);
+    else specs.set(specId(spec, path.basename(file).replace(/\.json$/i, '')), spec);
+  }
+  return docs.flatMap((d) => buildGraph(d, { specs }).claims);
+}
+
+function cmdChangelog(args) {
+  const asJson = boolFlag(args, '--json');
+  const includeMerges = boolFlag(args, '--merges');
+  const outArg = valueFlag(args, '-o') || valueFlag(args, '--out');
+  const mdArg = valueFlag(args, '--md');
+  const titleArg = valueFlag(args, '--title');
+  const specDir = valueFlag(args, '--specs');
+  const repoArg = valueFlag(args, '--repo');
+  rejectUnknownFlags(args);
+
+  const repo = path.resolve(repoArg || process.cwd());
+  const run = gitRunner(repo);
+  const [rangeArg] = args;
+  // "v1.0..main" or just "main"; with neither, everything reachable from HEAD.
+  const [fromRaw, toRaw] = String(rangeArg || 'HEAD').split('..');
+  const to = toRaw || (rangeArg && rangeArg.includes('..') ? 'HEAD' : fromRaw) || 'HEAD';
+  const from = rangeArg && rangeArg.includes('..') ? fromRaw : null;
+
+  const commits = readCommits(run, from, to, { includeMerges });
+  if (commits === null) fail(`Cannot read git history for ${rangeArg || to} in ${repo}. Is it a repository, and does that range exist?`);
+
+  const fromCommit = from ? resolveRef(run, from) : null;
+  const toCommit = resolveRef(run, to);
+
+  // Only meaningful with both ends and somewhere to look for specs.
+  let claimDiff = null;
+  if (specDir && fromCommit && toCommit) {
+    const before = claimsAt(run, from, specDir);
+    const after = claimsAt(run, to, specDir);
+    if (before && after) claimDiff = diffClaims(before, after);
+    else console.error(`warning could not read ${specDir} at both ends of the range; the documentation diff is omitted`);
+  }
+
+  const pkg = readJson(path.join(root, 'package.json'));
+  const log = buildChangelog({ commits, from, to, fromCommit, toCommit, generator: `vibex ${pkg.version}`, claimDiff });
+
+  const out = path.resolve(outArg || 'changelog.json');
+  writeOut(out, `${JSON.stringify(log, null, 2)}\n`);
+
+  let mdOut = null;
+  if (mdArg) {
+    const remote = run(['remote', 'get-url', 'origin']);
+    const repository = remote ? { url: remote.trim() } : readRepositoryFrom(specDir);
+    mdOut = path.resolve(mdArg);
+    writeOut(mdOut, changelogToMarkdown(log, { repository, title: titleArg || null }));
+  }
+
+  if (asJson) {
+    console.log(JSON.stringify({ ok: true, out, ...(mdOut ? { markdown: mdOut } : {}), impact: log.impact }, null, 2));
+  } else {
+    console.log(out);
+    if (mdOut) console.log(mdOut);
+    const i = log.impact;
+    console.error(`${i.commits} commit(s), ${i.authors.length} author(s), ${i.specs_changed.length} spec(s) touched`
+      + `${i.grouping === 'inferred' ? ' — sections inferred from file paths, not commit messages' : ''}`);
+    if (i.claims) {
+      const c = i.claims;
+      console.error(`claims: +${c.added.length} added, ${c.reworded.length} reworded, ${c.superseded.length} superseded, -${c.removed.length} removed`);
+    }
+  }
+}
+
+// The repository URL lives in the specs, so commit links work without config.
+function readRepositoryFrom(dir) {
+  if (!dir || !fs.existsSync(dir)) return null;
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    try {
+      const spec = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+      if (spec?.meta?.repository?.url) return spec.meta.repository;
+    } catch { /* not a spec */ }
+  }
+  return null;
 }
 
 function cmdDocs(args) {
@@ -409,6 +508,7 @@ switch (command) {
   case 'import': await cmdImport(rest); break;
   case 'dashboard': await cmdDashboard(rest); break;
   case 'docs': cmdDocs(rest); break;
+  case 'changelog': cmdChangelog(rest); break;
   case 'demo': await cmdDemo(rest); break;
   case 'types': cmdTypes(); break;
   case undefined: case 'help': case '-h': case '--help': console.log(HELP); break;

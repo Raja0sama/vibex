@@ -233,6 +233,20 @@ Regenerate and re-paste rather than editing the Markdown: it is an output, and a
 
 Give the counts line verbatim (`N claims — X verified, …`), every `coverage.unknown` entry, and which claims you anchored versus which the user asserted. If you left something undocumented, say so — it should already be in `out_of_scope`. When the document came out of a conversation, list what you attributed to them by name, so they can correct it before it hardens into documentation.
 
+## Release notes (`changelog`)
+
+```bash
+node bin/vibex.mjs changelog v1.2.0..main --specs docs/arch --md RELEASE.md -o changelog.json
+```
+
+Reads the commits in a range and writes two things: a JSON artefact to keep in the repository, and Markdown with no raw HTML so it survives a paste into release notes or a wiki.
+
+- **`--specs <dir>` is what makes it worth running here.** It builds the fact graph at both ends of the range and reports what the release did to the documentation: claims written, reworded, superseded, removed. Derived facts are counted, never listed.
+- **Sections are a guess unless the project uses conventional commits.** When they are, the artefact and the Markdown both say so. Do not present an inferred grouping as the author's intent.
+- A commit is only `internal` when *every* path it touched was.
+
+Report the counts line as it prints, and if claims were **removed**, say so out loud — a claim that vanished took whatever it documented with it, and that is worth a human checking.
+
 ## Authoring rules
 
 - Under ~25 entities, ~15 C4 elements, ~80 endpoints per diagram. Past that, split by ERD `groups`, C4 level, or endpoint group, and link with `link` (C4) or a card.

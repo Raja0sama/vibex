@@ -20,6 +20,8 @@ import { head, dirtyPaths, changedSince, shortSha, prefix as gitPrefix, underPre
 import { planCheck, mergeLock, verifiedCommits } from '../renderers/docs/incremental.mjs';
 import { issueUrl, contextBlock, issueEndpoint } from '../renderers/shared/intake.mjs';
 import { parseIntake, triage, PLAYBOOK } from '../renderers/shared/triage.mjs';
+import { readCommits, buildChangelog, diffClaims, resolve as resolveRef } from '../renderers/changelog/from-git.mjs';
+import { changelogToMarkdown } from '../renderers/changelog/to-markdown.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -1059,4 +1061,114 @@ test('triage: a fenced block in an issue is input to check, not a fact to trust'
   assert.doesNotThrow(() => parseIntake('```vibex\n' + 'a: b\n'.repeat(5000) + '```'));
   assert.equal(parseIntake('').intent, null);
   assert.equal(parseIntake(undefined).hadBlock, false);
+});
+
+// ------------------------------------------------------------- changelog
+
+// A scripted history, so the parser is tested rather than this repository.
+function fakeGit(log) {
+  const US = String.fromCharCode(31); const RS = String.fromCharCode(30);
+  return (args) => {
+    if (args[0] === 'rev-parse') return `${args[1]}0000000000000000000000000000000000`.slice(0, 40);
+    if (args[0] === 'remote') return 'https://github.com/acme/thing.git\n';
+    if (args[0] !== 'log') return null;
+    return log.map((c) => `${RS}${c.sha}${US}${c.author}${US}${c.at}${US}${c.subject}${US}${c.body || ''}${US}${(c.paths || []).join('\n')}`).join('');
+  };
+}
+
+test('changelog: conventional prefixes are honoured, and their absence is admitted', () => {
+  const conventional = readCommits(fakeGit([
+    { sha: 'a'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'feat(docs): add a thing', paths: ['renderers/x.mjs'] },
+    { sha: 'b'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'fix!: break it properly', paths: ['bin/vibex.mjs'] },
+  ]), 'v1', 'HEAD');
+  const log = buildChangelog({ commits: conventional, from: 'v1', to: 'HEAD', now: NOW });
+  assert.equal(log.impact.grouping, 'mixed', 'the author said what these were');
+  // feat(docs) is a feature scoped to docs, so it belongs under Added: the type
+  // decides the section and the scope is only a label.
+  assert.deepEqual(log.sections.map((s) => s.id).sort(), ['added', 'breaking']);
+  assert.equal(log.entries.find((e) => e.short === 'bbbbbbb').breaking, true);
+  assert.equal(log.entries[0].scope, 'docs');
+
+  // Prose history: the section is a guess, and the artefact says so.
+  const prose = readCommits(fakeGit([
+    { sha: 'c'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'Give ERD edges their own lanes', paths: ['renderers/erd/render-erd.mjs', '.github/workflows/ci.yml'] },
+  ]), 'v1', 'HEAD');
+  const guessed = buildChangelog({ commits: prose, from: 'v1', to: 'HEAD', now: NOW });
+  assert.equal(guessed.impact.grouping, 'inferred');
+  assert.equal(guessed.entries[0].grouped_by, 'paths');
+  // Touching a workflow alongside a renderer does not make a commit internal.
+  assert.equal(guessed.entries[0].section, 'changed');
+
+  const md = changelogToMarkdown(guessed, { repository: { url: 'https://github.com/acme/thing' } });
+  assert.match(md, /inferred from the files each commit touched/, 'the reader is told it is a guess');
+});
+
+test('changelog: only paths that are entirely internal make a commit internal', () => {
+  const only = (paths) => buildChangelog({
+    commits: readCommits(fakeGit([{ sha: 'd'.repeat(40), author: 'A', at: '2026-09-19T00:00:00Z', subject: 'x', paths }]), 'v1', 'HEAD'),
+    from: 'v1', to: 'HEAD', now: NOW,
+  }).entries[0].section;
+
+  assert.equal(only(['test/a.test.mjs', '.github/workflows/ci.yml']), 'internal');
+  assert.equal(only(['showcase/relay.c4.json']), 'internal');
+  assert.equal(only(['test/a.test.mjs', 'renderers/x.mjs']), 'changed');
+  assert.equal(only(['SKILL.md', 'README.md']), 'docs');
+  assert.equal(only([]), 'changed');
+});
+
+test('changelog: a spec file in the diff is named, and the range is recorded', () => {
+  const commits = readCommits(fakeGit([
+    { sha: 'e'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'x', paths: ['docs/arch/orders.erd.json', 'docs/arch/auth.docs.json', 'src/unrelated.ts'] },
+  ]), 'v1', 'HEAD');
+  const log = buildChangelog({ commits, from: 'v1', to: 'HEAD', fromCommit: 'f'.repeat(40), toCommit: '0'.repeat(40), now: NOW });
+  assert.deepEqual(log.entries[0].specs.sort(), ['auth.docs', 'orders.erd']);
+  assert.deepEqual(log.impact.specs_changed, ['auth.docs', 'orders.erd']);
+  assert.equal(log.range.from, 'v1');
+  assert.equal(log.range.from_commit.length, 40);
+});
+
+test('changelog: what a release did to the documentation separates written from computed', () => {
+  const asserted = (id, text) => ({ id, text, source: { kind: 'asserted', by: 'a', at: '2026-01-01' } });
+  const derived = (id, text) => ({ id, text, source: { kind: 'derived', spec: 's', rule: 'r' } });
+
+  const before = [asserted('kept', 'unchanged'), asserted('gone', 'removed later'), asserted('reword', 'old wording'), derived('d1', 'x')];
+  const after = [
+    asserted('kept', 'unchanged'),
+    asserted('reword', 'new wording'),
+    asserted('fresh', 'brand new'),
+    { ...asserted('replacement', 'takes over'), supersedes: 'gone' },
+    derived('d2', 'y'), derived('d3', 'z'),
+  ];
+  const d = diffClaims(before, after);
+
+  assert.deepEqual(d.added.sort(), ['fresh', 'replacement'], 'only written claims are listed');
+  assert.deepEqual(d.removed, ['gone']);
+  assert.deepEqual(d.superseded, [{ id: 'replacement', replaces: 'gone' }]);
+  assert.deepEqual(d.reworded.map((c) => c.id), ['reword']);
+  assert.equal(d.derived_added, 2, 'computed facts are counted, not named');
+  assert.equal(d.derived_removed, 1);
+
+  const md = changelogToMarkdown(
+    buildChangelog({ commits: [], from: 'v1', to: 'v2', now: NOW, claimDiff: d }),
+    { repository: { url: 'https://github.com/acme/thing' } },
+  );
+  assert.match(md, /2 derived facts appeared and 1 disappeared/);
+  assert.match(md, /check these were meant to go, not lost in a rewrite/);
+  // It travels, so no raw HTML beyond the one generated-by line.
+  assert.equal((md.match(/<\/?[a-zA-Z][^>\n]*>/g) || []).filter((t) => !/^<\/?sub>$/.test(t)).length, 0);
+});
+
+test('changelog: git failing is unknown, never "nothing changed"', () => {
+  const dead = () => null;
+  assert.equal(readCommits(dead, 'v1', 'HEAD'), null);
+  assert.equal(resolveRef(dead, 'HEAD'), null);
+
+  // A long list of ids stops being information; the markdown caps it.
+  const many = Array.from({ length: 40 }, (_, i) => `claim.${i}`);
+  const md = changelogToMarkdown(buildChangelog({
+    commits: [], from: 'v1', to: 'v2', now: NOW,
+    claimDiff: { added: many, removed: [], superseded: [], reworded: [], derived_added: 0, derived_removed: 0 },
+  }), {});
+  assert.match(md, /and 28 more/);
+  assert.ok(!md.includes('claim.39'), 'the tail is summarised, not printed');
 });
