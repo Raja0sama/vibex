@@ -297,6 +297,7 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
     <nav>
       <a href="#diagrams">Diagrams</a>
       <a href="#docs">Docs</a>
+      <a href="#skill">Skill</a>
       <a href="#how">How it works</a>
       <a href="#loop">Intake</a>
       <a href="#next">Next</a>
@@ -326,9 +327,9 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       <a class="btn btn-primary" href="demo/dashboard.html">Open the live demo
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px" aria-hidden="true"><path d="M4 12h14"/><path d="M13 7l5 5-5 5"/></svg>
       </a>
-      <span class="cmd"><b>$</b> npx @vibex/vibex demo out</span>
+      <span class="cmd"><b>$</b> npm i -g @vibex/vibex</span>
     </div>
-    <p class="fineprint">CLI and Claude Code skill · MIT · Node 18+ · zero dependencies · no build step</p>
+    <p class="fineprint">A Claude Code / Cursor skill, with a CLI underneath &middot; MIT &middot; Node 18+ &middot; zero dependencies &middot; no build step</p>
 
     <figure class="shot">
       <div class="shot-bar">
@@ -673,21 +674,31 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       </article>
     </div>
 
-    <div class="ask">
+    <div class="ask" id="skill">
       <div>
-        <p class="eyebrow">INSTALLS AS A SKILL</p>
-        <h2>Or skip the flags and just ask</h2>
-        <p>Symlink the folder into your skills directory and the whole CLI collapses into a sentence. Claude finds the schema, picks the diagram type, writes the spec and renders it.</p>
+        <p class="eyebrow">INSTALL IT AS A SKILL</p>
+        <h2 style="margin-top:16px">Stop learning flags</h2>
+        <p>vibeX is a Claude Code / Cursor skill first and a CLI second. Installed as a skill, the whole command surface collapses into a sentence &mdash; Claude reads <code style="font-size:14px;color:var(--text)">SKILL.md</code>, finds your schema, picks the type, writes the spec and renders it.</p>
+        <p style="margin-top:14px"><code style="font-size:14px;color:var(--text)">SKILL.md</code> ships inside the npm package, so a global install and one symlink is the whole setup &mdash; and you get a pinned version rather than whatever is in a working copy.</p>
+        <div class="term" style="margin-top:20px;line-height:1.85">
+          <div><span style="color:var(--ep)">$</span> npm i -g @vibex/vibex</div>
+          <div><span style="color:var(--ep)">$</span> ln -s "$(npm root -g)/@vibex/vibex" \</div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;~/.claude/skills/vibex</div>
+        </div>
       </div>
       <div class="term">
         <div class="q">&gt; show me the data model</div>
-        <div class="a">&nbsp;&nbsp;wrote db.erd.json · db.erd.html</div>
+        <div class="a">&nbsp;&nbsp;wrote db.erd.json &middot; db.erd.html</div>
         <div class="gap"></div>
         <div class="q">&gt; now the endpoints</div>
-        <div class="a">&nbsp;&nbsp;wrote api.endpoints.json · api.endpoints.html</div>
+        <div class="a">&nbsp;&nbsp;wrote api.endpoints.json &middot; api.endpoints.html</div>
         <div class="gap"></div>
         <div class="q">&gt; what happens after approval?</div>
-        <div class="a">&nbsp;&nbsp;wrote request.lifecycle.json · .html</div>
+        <div class="a">&nbsp;&nbsp;wrote request.lifecycle.json &middot; .html</div>
+        <div class="gap"></div>
+        <div class="q">&gt; document auth, fail CI when it drifts</div>
+        <div class="a">&nbsp;&nbsp;wrote auth.docs.json &middot; 41 claims,</div>
+        <div class="a">&nbsp;&nbsp;38 verified</div>
       </div>
     </div>
   </section>

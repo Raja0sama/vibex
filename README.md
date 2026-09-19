@@ -81,12 +81,12 @@ vibex dashboard docs/index.html docs --title "Payments platform" --repo .
 No source schema? It reads the code — NestJS controllers, GraphQL resolvers,
 TypeORM entities, Express routers, SQL migrations — and writes the spec itself.
 
-<details>
-<summary><b>Or skip the flags and just ask</b> — vibeX installs as a Claude Code / Cursor skill</summary>
 
-<br>
+## Install it as a skill and stop learning flags
 
-The whole CLI collapses into a sentence:
+vibeX is a Claude Code / Cursor skill first and a CLI second. Installed as a skill, the
+whole command surface collapses into a sentence — Claude reads `SKILL.md`, finds your
+schema, picks the diagram type, writes the spec and renders it:
 
 ```
 > show me the data model
@@ -97,11 +97,54 @@ The whole CLI collapses into a sentence:
 
 > what happens after a request is approved?
   wrote request.lifecycle.json · request.lifecycle.html
+
+> document the auth service and fail CI when it drifts
+  wrote auth.docs.json · 41 claims, 38 verified
 ```
 
+**Install it.** `SKILL.md` ships inside the npm package, so a global install plus one
+symlink is all it takes — and you get a pinned version rather than whatever is in a
+working copy:
+
 ```bash
-npx skills add Raja0sama/vibex     # or: git clone && ln -s "$(pwd)" ~/.claude/skills/vibex
+npm i -g @vibex/vibex
+ln -s "$(npm root -g)/@vibex/vibex" ~/.claude/skills/vibex
+```
+
+Check it landed:
+
+```bash
 node ~/.claude/skills/vibex/bin/vibex.mjs types
+```
+
+Then just ask. Claude picks the skill up from the folder name; the CLI underneath is
+there when you want it, not something you have to learn first.
+
+<details>
+<summary><b>Other ways in</b> — project-local, from source, or the skills registry</summary>
+
+<br>
+
+**Project-local**, so the skill travels with the repository rather than your machine:
+
+```bash
+mkdir -p .claude/skills
+ln -s "$(npm root -g)/@vibex/vibex" .claude/skills/vibex
+```
+
+**From source**, if you are changing vibeX itself — the symlink tracks your working copy,
+so edits apply the moment you save:
+
+```bash
+git clone https://github.com/Raja0sama/vibex && cd vibex
+ln -s "$(pwd)" ~/.claude/skills/vibex
+```
+
+**From the skills registry** — `skills add` takes GitHub repositories, not npm packages,
+so this needs the repository to be public. It is private today, so this does not work yet:
+
+```bash
+npx skills add Raja0sama/vibex     # once the repository is public
 ```
 
 </details>
@@ -299,8 +342,8 @@ A new diagram type is a schema, a validator function, a renderer that emits
 ## Install
 
 ```bash
-npx @vibex/vibex demo out           # the package is scoped
-npm i -g @vibex/vibex && vibex types
+npm i -g @vibex/vibex               # the CLI, and the skill source above
+npx @vibex/vibex demo out           # or run it once without installing
 ```
 
 > The unscoped `vibex` on npm is an unrelated package. Always install `@vibex/vibex`.
