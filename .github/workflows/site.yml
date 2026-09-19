@@ -1,0 +1,44 @@
+name: site
+
+# Vercel owns deployment. This job exists so a broken showcase is caught in the
+# pull request rather than in production: it runs the same build command Vercel
+# runs, then the gates that matter for a public demo of checkable documentation.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the docs build diffs against the commit a lock file names,
+      # and a check that silently degrades is worse than none.
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: build the site exactly as Vercel will
+        run: npm run build:site
+
+      - name: the demo CTAs must resolve
+        run: |
+          test -f site/index.html
+          test -f site/favicon.svg
+          test -f site/demo/dashboard.html
+          test -f site/demo/relay.md
+          test -f site/demo/docs.json
+
+      # A public demo of documentation you can trust cannot ship a claim it
+      # could not verify.
+      - name: the showcase must not publish an unverifiable claim
+        run: |
+          node -e '
+            const html = require("fs").readFileSync("site/demo/dashboard.html", "utf8");
+            const broken = (html.match(/conf broken/g) || []).length;
+            if (broken) { console.error(`::error::${broken} unverifiable claims in the public demo`); process.exit(1); }
+            console.log("showcase is clean");
+          '

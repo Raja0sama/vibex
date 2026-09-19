@@ -46,7 +46,8 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "demo": "node bin/vibex.mjs demo out",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "build:site": "node scripts/build-site.mjs"
   },
   "optionalDependencies": {
     "yaml": "^2.6.0"
