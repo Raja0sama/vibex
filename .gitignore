@@ -7,6 +7,7 @@ site/demo/
 *.tgz
 .DS_Store
 .claude/
+content/
 
 # Generated docs artefacts (docs.lock.json IS committed — it is the record)
 docs.json
