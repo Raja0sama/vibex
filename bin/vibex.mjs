@@ -496,11 +496,36 @@ async function cmdDemo(args) {
   // The example's claims are anchored to the fixture repo shipped for the tests,
   // so the demo shows a document whose anchors actually check out.
   const fixtureRepo = path.join(root, 'examples/shop-repo');
+
+  // The demo is the first thing anyone runs, so it should show every panel the
+  // tool can produce — Changes included. Installed from npm there is no git
+  // history to read, and a missing panel beats a failed demo, so this gives up
+  // quietly rather than taking the whole command down with it.
+  let changelog = null;
+  try {
+    const run = gitRunner(root);
+    const commits = readCommits(run, null, 'HEAD', { includeMerges: false });
+    if (commits && commits.length) {
+      const remote = run(['remote', 'get-url', 'origin']);
+      changelog = buildChangelog({
+        commits,
+        from: null,
+        to: 'HEAD',
+        fromCommit: null,
+        toCommit: resolveRef(run, 'HEAD'),
+        claimDiff: null,
+        generator: `vibex ${readJson(path.join(root, 'package.json')).version}`,
+        repository: remote ? { url: remote.trim() } : null,
+      });
+    }
+  } catch { changelog = null; }
+
   const dash = renderDashboard(examples, {
     title: 'Shop platform',
-    subtitle: 'Example dashboard: architecture, data model, APIs, documentation',
+    subtitle: 'Example dashboard: architecture, data model, APIs, documentation, changes',
     anchorStatus: (spec) => anchorStatusFor(spec, fixtureRepo),
     commit: head(gitRunner(root)),
+    changelog,
   });
   writeOut(path.join(outDir, 'dashboard.html'), dash.html);
   console.log(path.join(outDir, 'dashboard.html'));
