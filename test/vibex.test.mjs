@@ -9,7 +9,7 @@ import { importOpenApi } from '../importers/openapi.mjs';
 import { importGraphql, parseSdl } from '../importers/graphql.mjs';
 import { importPrisma } from '../importers/prisma.mjs';
 import { renderDashboard } from '../renderers/shared/dashboard.mjs';
-import { channelOffsets, routeOrthogonal } from '../renderers/shared/layout.mjs';
+import { channelOffsets, routeOrthogonal, placeLabel, overlapArea } from '../renderers/shared/layout.mjs';
 import { hashRegion, checkAnchor } from '../renderers/docs/anchors.mjs';
 import { buildGraph } from '../renderers/docs/graph.mjs';
 import { runGenerator } from '../renderers/docs/facts.mjs';
@@ -1240,4 +1240,67 @@ test('changelog panel: the dashboard shows one when a changelog artefact is supp
   const without = renderDashboard(items, { title: 'T' });
   assert.ok(!without.html.includes('data-panel="changelog"'));
   assert.equal(without.entries.length, withLog.entries.length, 'it takes no diagram slot');
+});
+
+test('layout: no edge label is drawn on top of a node, in any diagram we ship', () => {
+  // The SVG carries absolute coordinates, so this needs no browser: pull the
+  // rects straight out and check them against each other.
+  const attr = (tag, name) => {
+    const m = new RegExp(`\\\\b${name}="(-?[\\\\d.]+)"`).exec(tag);
+    return m ? Number(m[1]) : null;
+  };
+  const rects = (svg, cls) => [...svg.matchAll(/<rect\b[^>]*>/g)]
+    .map((m) => m[0])
+    .filter((tag) => new RegExp(`class="[^"]*\\\\b${cls}\\\\b`).test(tag))
+    .map((tag) => ({ x: attr(tag, 'x'), y: attr(tag, 'y'), w: attr(tag, 'width'), h: attr(tag, 'height') }))
+    .filter((r) => r.x !== null && r.w);
+
+  const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+  const specs = [
+    ...DIAGRAM_EXAMPLES.map((n) => `examples/${n}`),
+    ...fs.readdirSync(path.join(root, 'showcase'))
+      .filter((f) => /\.(erd|c4|endpoints|lifecycle)\.json$/.test(f))
+      .map((f) => `showcase/${f}`),
+  ];
+  assert.ok(specs.length >= 10, `expected the showcase to be wide, saw ${specs.length}`);
+
+  for (const file of specs) {
+    const { html, report } = renderSpec(json(file));
+    assert.ok(report.ok, `${file} does not validate`);
+    const svg = html.slice(html.indexOf('<svg'), html.indexOf('</svg>'));
+
+    const boxes = rects(svg, 'box');
+    const labels = rects(svg, 'label-bg');
+    if (!labels.length) continue;
+
+    const onBox = labels.filter((l) => boxes.some((b) => hit(l, b)));
+    assert.equal(onBox.length, 0, `${file}: ${onBox.length} of ${labels.length} labels sit on a node`);
+
+    const onLabel = labels.filter((a, i) => labels.some((b, j) => j !== i && hit(a, b)));
+    assert.equal(onLabel.length, 0, `${file}: ${onLabel.length} labels overlap each other`);
+  }
+});
+
+test('layout: the least-bad position is chosen when every candidate collides', () => {
+  // Boxed in on all sides, so no free spot exists and the fallback must choose.
+  const wall = (x, y, w, h) => ({ x, y, w, h });
+  const obstacles = [];
+  for (let x = -400; x <= 400; x += 40) {
+    for (let y = -400; y <= 400; y += 40) obstacles.push(wall(x, y, 38, 38));
+  }
+  // One gap, deliberately off to the side: the label should find it.
+  const gap = obstacles.findIndex((o) => o.x === 200 && o.y === 0);
+  obstacles.splice(gap, 1);
+
+  const box = placeLabel([[0, 0], [400, 0]], 30, 20, obstacles);
+  assert.ok(box.w === 30 && box.h === 20, 'it still returns a box of the right size');
+  const worst = obstacles.reduce((sum, o) => sum + overlapArea(box, o), 0);
+  const centre = { x: 200 - 15, y: 0 - 10, w: 30, h: 20 };
+  const centreCost = obstacles.reduce((sum, o) => sum + overlapArea(centre, o), 0);
+  assert.ok(worst <= centreCost, `fallback took a worse spot than the midpoint (${worst} vs ${centreCost})`);
+
+  // The measure itself.
+  assert.equal(overlapArea({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 }), 25);
+  assert.equal(overlapArea({ x: 0, y: 0, w: 10, h: 10 }, { x: 20, y: 0, w: 10, h: 10 }), 0);
 });

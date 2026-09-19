@@ -113,6 +113,13 @@ export function bbox(rects, pad = 0) {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
+// How much two rects share, so "least bad" can be measured rather than guessed.
+export function overlapArea(a, b) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
 export function rectsOverlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -390,18 +397,25 @@ export function placeLabel(points, lw, lh, obstacles) {
   };
   // Pass 1: on the line. Pass 2+: nudged off the line, away from whatever it
   // collided with, so a label never sits on a node when any free spot exists.
-  for (const k of [0, 1, -1, 2, -2, 3, -3]) {
+  const steps = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5];
+  for (const k of steps) {
     for (const t of candidates) {
       const box = boxAt(t, k);
       if (free(box) && clearOfMarkers(t)) return box;
     }
   }
-  // Last resort: accept sitting on a node, but never on another label.
-  for (const k of [0, 1, -1, 2, -2, 3, -3]) {
+  // Last resort: something has to give. Clipping a box corner is readable and
+  // sitting across its title is not, so take the least bad spot rather than
+  // the first one that happens to clear the other labels.
+  let best = null;
+  for (const k of steps) {
     for (const t of candidates) {
       const box = boxAt(t, k);
-      if (freeOfLabels(box)) return box;
+      if (!freeOfLabels(box)) continue;
+      const cost = obstacles.reduce((sum, o) => sum + (o.label ? 0 : overlapArea(box, o)), 0);
+      if (!best || cost < best.cost) best = { box, cost };
+      if (cost === 0) return box;
     }
   }
-  return boxAt(0.5, 0);
+  return best ? best.box : boxAt(0.5, 0);
 }
