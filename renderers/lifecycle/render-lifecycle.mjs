@@ -79,7 +79,7 @@ function renderState(state, rect, direction) {
       : `<path class="start-line" d="M${sx} ${sy + START_R} L${sx} ${y}" marker-end="url(#m-arrow)"/>`;
   }
   const rx = kind === 'terminal' ? h / 2 : 10;
-  out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`;
+  out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`;
   if (kind === 'terminal') out += `<rect class="box-inner" x="${x + 4}" y="${y + 4}" width="${w - 8}" height="${h - 8}" rx="${(h - 8) / 2}"/>`;
   const lines = descLines(state, w);
   const cx = x + w / 2;
@@ -91,13 +91,34 @@ function renderState(state, rect, direction) {
   return out;
 }
 
+const LABEL_CHARS = 38;
+
 function transitionLines(t) {
   const first = t.label || t.event || '';
   const lines = [];
-  if (first) lines.push({ text: truncate(t.actor ? `${t.actor}: ${first}` : first, 44), cls: 'label' });
-  if (t.guard) lines.push({ text: truncate(`[${t.guard}]`, 44), cls: 'label tech' });
-  if (t.action) lines.push({ text: truncate(`/ ${t.action}`, 44), cls: 'label tech' });
+  if (first) lines.push({ text: truncate(t.actor ? `${t.actor}: ${first}` : first, LABEL_CHARS), cls: 'label' });
+  if (t.guard) lines.push({ text: truncate(`[${t.guard}]`, LABEL_CHARS), cls: 'label tech' });
+  if (t.action) lines.push({ text: truncate(`/ ${t.action}`, LABEL_CHARS), cls: 'label tech' });
   return lines;
+}
+
+function labelSize(lines) {
+  const widest = Math.max(0, ...lines.map((l) => textWidth(l.text, l.cls.includes('tech') ? 10.5 : 11.5)));
+  return { w: widest + 12, h: lines.length * 13 + 6 };
+}
+
+// Transition labels live in the gap between ranks. A fixed gap that is narrower
+// than the widest label does not make the label smaller — it puts it on top of
+// a state. So the gap is measured from the labels that have to fit in it.
+function gapsFor(transitions) {
+  let w = 0; let h = 0;
+  for (const t of transitions) {
+    const lines = transitionLines(t);
+    if (!lines.length) continue;
+    const size = labelSize(lines);
+    w = Math.max(w, size.w); h = Math.max(h, size.h);
+  }
+  return { w, h };
 }
 
 function renderTransition(t, index, rects, offset, obstacles) {
@@ -116,8 +137,7 @@ function renderTransition(t, index, rects, offset, obstacles) {
   const lines = transitionLines(t);
   let labelSvg = '';
   if (lines.length) {
-    const widest = Math.max(...lines.map((l) => textWidth(l.text, l.cls.includes('tech') ? 10.5 : 11.5)));
-    const lw = widest + 12; const lh = lines.length * 13 + 6;
+    const { w: lw, h: lh } = labelSize(lines);
     const box = placeLabel(route.points, lw, lh, obstacles);
     obstacles.push({ ...box, label: true });
     labelSvg = `<g${base.replace('class="edge"', `class="edge-label ${kind}"`).replace(/ id="[^"]*"/, '').replace(/ tabindex="0"/, '').replace(/ role="button"/, '')}><title>${esc(tip)}</title>`;
@@ -132,10 +152,11 @@ export function renderLifecycle(spec) {
   const layout = spec.layout || {};
   const direction = layout.direction === 'tb' ? 'tb' : 'lr';
   const rows = autoRanks(spec);
+  const label = gapsFor(spec.transitions || []);
   const placement = rowsPlace(rows, {
     direction,
-    gapX: num(layout.gapX, direction === 'lr' ? 130 : 80),
-    gapY: num(layout.gapY, direction === 'lr' ? 56 : 110),
+    gapX: num(layout.gapX, Math.max(direction === 'lr' ? 130 : 80, label.w + 30)),
+    gapY: num(layout.gapY, Math.max(direction === 'lr' ? 56 : 110, label.h + 22)),
     originX: MARGIN + (direction === 'lr' ? START_GAP + START_R : 0),
     originY: MARGIN + (direction === 'tb' ? START_GAP + START_R : 0),
     sizeOf,
@@ -156,7 +177,7 @@ export function renderLifecycle(spec) {
   const width = extent.x + extent.w + MARGIN + 60;
   const height = extent.y + extent.h + MARGIN + 20;
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
-  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'lifecycle' });
+  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'lifecycle', proposed: spec.meta.proposed === true });
   const kinds = new Set(spec.states.map((s) => s.kind || 'normal'));
   const legend = [
     { key: 'initial', label: 'Initial state (● start)', style: 'background:var(--surface);border:2px solid var(--accent)' },

@@ -1,0 +1,33 @@
+name: Request a document
+description: Ask for something to be documented that is not documented yet.
+title: "Document: "
+labels: [docs, intake]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You do not need to know how the docs work. Say what you wanted to find out
+        and could not — that is the most useful thing you can give us.
+  - type: textarea
+    id: question
+    attributes:
+      label: What question should this answer?
+      description: One sentence, in your own words. "How does a refund actually reach the customer?" is perfect.
+      placeholder: How does ...
+    validations: { required: true }
+  - type: textarea
+    id: context
+    attributes:
+      label: What made you ask?
+      description: What were you doing when you needed this? It tells us how deep to go.
+  - type: input
+    id: area
+    attributes:
+      label: Which part of the system, if you know
+      placeholder: the BFF, the orders table, checkout...
+  - type: textarea
+    id: vibex
+    attributes:
+      label: Context
+      description: Filled in automatically if you came from a diagram. Leave it as it is.
+      render: vibex

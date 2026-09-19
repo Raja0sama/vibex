@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs-graph.schema.json",
+  "title": "vibeX docs graph \u2014 the emitted artifact",
+  "description": "What the build WRITES to docs.json, next to the HTML. The dashboard renders it for people; agents read it directly. Every fact in the system appears here exactly once, with its provenance and a computed confidence, addressable by id. Nothing in this file is hand-written.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact",
+    "generated_at",
+    "claims",
+    "subjects",
+    "coverage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "artifact": {
+      "const": "docs-graph"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator": {
+      "type": "string",
+      "description": "Tool and version that produced this, e.g. \"vibex 0.1.0\"."
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string",
+              "description": "The commit the derived claims and anchor hashes were computed against. Without this the graph cannot be reproduced."
+            }
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "description": "The whole fact set, flat. Read this, not the sections, when you are a program.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "source",
+          "confidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string",
+            "description": "`<spec-id>` or `<spec-id>#<node-id>`."
+          },
+          "section": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "description": "Provenance. `derived` claims are recomputed from a spec on every build and cannot drift; the other two are checked.",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "spec",
+                  "rule"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "derived"
+                  },
+                  "spec": {
+                    "type": "string",
+                    "description": "Spec id the fact was read from."
+                  },
+                  "rule": {
+                    "type": "string",
+                    "description": "Generator that produced it, e.g. `erd.relationships`. Lets a reader reproduce the fact by hand."
+                  }
+                }
+              },
+              {
+                "$ref": "docs.schema.json#/$defs/anchored"
+              },
+              {
+                "$ref": "docs.schema.json#/$defs/asserted"
+              }
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "verified",
+              "stale",
+              "broken",
+              "asserted",
+              "expired"
+            ],
+            "description": "Computed, never authored. `verified` = derived from the spec, or anchored with a matching hash. `stale` = anchored, the code changed, nobody has re-read it. `broken` = anchored and the anchor establishes nothing: the file or symbol is gone, or the repository was not available to check it. `asserted` = a person said so, within the review window. `expired` = a person said so, too long ago to rely on."
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Why the confidence is not `verified`, in one line, e.g. \"bff/src/auth/session.service.ts changed since 2026-04-02\"."
+          },
+          "superseded_by": {
+            "type": "string",
+            "description": "Present on a tombstone. The claim's text is kept so an old citation still resolves to something honest."
+          },
+          "verified_commit": {
+            "type": "string",
+            "description": "The commit this anchor was last seen matching at. Survives builds that reused the previous result instead of re-reading the file, so it answers \"how current is this claim\" rather than \"when did the build run\"."
+          }
+        }
+      }
+    },
+    "subjects": {
+      "type": "array",
+      "description": "Every node across the covered specs, with the claims about it gathered in one place. This is the index an agent queries: \"what is known about `orders`\" is one lookup, not a search.",
+      "items": {
+        "type": "object",
+        "required": [
+          "ref",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "`<spec-id>#<node-id>`."
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Node kind in its own spec: entity, container, operation, state\u2026"
+          },
+          "spec": {
+            "type": "string"
+          },
+          "diagram_type": {
+            "enum": [
+              "erd",
+              "c4",
+              "endpoints",
+              "lifecycle"
+            ]
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Claim ids about this subject, derived and authored together."
+          },
+          "related": {
+            "type": "array",
+            "description": "Edges out of this node, already resolved, so an agent can answer \"what breaks if I change this\" without re-reading the diagram specs.",
+            "items": {
+              "type": "object",
+              "required": [
+                "ref",
+                "relation"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string"
+                },
+                "relation": {
+                  "type": "string",
+                  "description": "e.g. `writes`, `reads`, `depends-on`, `transitions-to`, `foreign-key`."
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "sources": {
+            "$ref": "common.schema.json#/$defs/sources"
+          }
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "description": "Human reading order. A projection of `claims`, holding ids only \u2014 the text lives in one place.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "claims"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "narrative": {
+            "type": "string",
+            "description": "The section's Markdown prose, carried through verbatim from the docs spec."
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Claim ids the narrative cites, in first-appearance order."
+          },
+          "renders": {
+            "type": "string",
+            "description": "A built-in block this section renders in place of claims, currently only \"coverage\"."
+          }
+        }
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "term",
+          "definition"
+        ],
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "string"
+          },
+          "see": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "specs",
+        "counts"
+      ],
+      "description": "What this graph does and does not know. Read it before trusting an absence: a thing missing from `subjects` is only meaningful if the area is not in `unknown`.",
+      "properties": {
+        "specs": {
+          "type": "array",
+          "description": "Specs actually read, with their revision, so a reader can tell how old the derived facts are.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "diagram_type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "diagram_type": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "subjects": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generated": {
+                "type": "boolean",
+                "description": "Whether the document drew generated facts from this spec. When false it was read only to resolve subjects, so its undocumented nodes are not reported as gaps."
+              }
+            }
+          }
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "claims": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verified": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stale": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "broken": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "asserted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expired": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "out_of_scope": {
+          "type": "array",
+          "description": "Deliberately absent, carried through from the authored docs spec.",
+          "items": {
+            "type": "object",
+            "required": [
+              "area",
+              "reason"
+            ],
+            "properties": {
+              "area": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unknown": {
+          "type": "array",
+          "description": "Absent and nobody said why. The build lists what it noticed and could not account for \u2014 a subject with no claims, a spec listed in `covers` that was never read. This section existing at all is the point: an empty docs graph that claims full coverage is the failure this feature exists to prevent.",
+          "items": {
+            "type": "object",
+            "required": [
+              "what",
+              "why"
+            ],
+            "properties": {
+              "what": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

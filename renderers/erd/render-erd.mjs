@@ -41,7 +41,7 @@ function renderEntity(entity, rect) {
   const kindTag = entity.kind && entity.kind !== 'table' ? entity.kind : (entity.schema || '');
   let out = `<g${nodeAttrs(entity.id, entity.name, { class: `node erd-entity kind-${entity.kind || 'table'}`, kind: entity.kind || 'table' })}>`;
   out += `<title>${esc(entity.name)}${entity.description ? ` — ${esc(entity.description)}` : ''}</title>`;
-  out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
+  out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${HEAD_H - 8} h${-w} z"/>`;
   out += `<line class="row-sep" x1="${x}" y1="${y + HEAD_H}" x2="${x + w}" y2="${y + HEAD_H}" style="stroke:var(--border)"/>`;
   const titleMax = fitChars(w - PAD_X * 2 - (kindTag ? textWidth(kindTag, 10.5) + 8 : 0), 13);
@@ -183,7 +183,7 @@ export function renderErd(spec) {
   const width = extent.x + extent.w + MARGIN + (hasGroups ? GROUP_PAD : 0) + 40;
   const height = extent.y + extent.h + MARGIN + (hasGroups ? GROUP_PAD : 0);
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
-  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'erd' });
+  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'erd', proposed: spec.meta.proposed === true });
 
   const legend = [
     { label: 'primary key', className: 'text pk', glyph: 'PK' },

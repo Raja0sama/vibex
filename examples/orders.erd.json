@@ -4,86 +4,305 @@
   "meta": {
     "title": "Orders domain",
     "subtitle": "Core tables behind checkout and fulfilment",
-    "repository": { "url": "https://github.com/example/shop-api", "revision": "main" }
+    "repository": {
+      "url": "https://github.com/example/shop-api",
+      "revision": "main"
+    }
   },
-  "layout": { "cols": 3 },
+  "layout": {
+    "cols": 3
+  },
   "groups": [
-    { "id": "identity", "label": "Identity", "entities": ["user", "address"] },
-    { "id": "commerce", "label": "Commerce", "entities": ["order", "order_item", "product", "payment", "order_status"] }
+    {
+      "id": "identity",
+      "label": "Identity",
+      "entities": [
+        "user",
+        "address"
+      ]
+    },
+    {
+      "id": "commerce",
+      "label": "Commerce",
+      "entities": [
+        "order",
+        "order_item",
+        "product",
+        "payment",
+        "order_status"
+      ]
+    }
   ],
   "entities": [
     {
-      "id": "user", "name": "users", "schema": "public", "description": "Registered customers",
+      "id": "user",
+      "name": "users",
+      "schema": "public",
+      "description": "Registered customers",
       "columns": [
-        { "name": "id", "type": "uuid", "pk": true },
-        { "name": "email", "type": "citext", "unique": true },
-        { "name": "full_name", "type": "text" },
-        { "name": "created_at", "type": "timestamptz", "default": "now()" }
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "email",
+          "type": "citext",
+          "unique": true
+        },
+        {
+          "name": "full_name",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "default": "now()"
+        }
       ],
-      "sources": [{ "path": "prisma/schema.prisma", "line": 12, "label": "model User" }]
-    },
-    {
-      "id": "address", "name": "addresses",
-      "columns": [
-        { "name": "id", "type": "uuid", "pk": true },
-        { "name": "user_id", "type": "uuid", "fk": "user.id" },
-        { "name": "line1", "type": "text" },
-        { "name": "country", "type": "char(2)" },
-        { "name": "is_default", "type": "bool", "default": "false" }
+      "sources": [
+        {
+          "path": "prisma/schema.prisma",
+          "line": 12,
+          "label": "model User"
+        }
       ]
     },
     {
-      "id": "order", "name": "orders", "description": "One checkout. Immutable after payment.",
+      "id": "address",
+      "name": "addresses",
       "columns": [
-        { "name": "id", "type": "uuid", "pk": true },
-        { "name": "user_id", "type": "uuid", "fk": "user.id" },
-        { "name": "shipping_address_id", "type": "uuid", "fk": "address.id", "nullable": true },
-        { "name": "status", "type": "order_status" },
-        { "name": "total_cents", "type": "int" },
-        { "name": "placed_at", "type": "timestamptz" }
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id"
+        },
+        {
+          "name": "line1",
+          "type": "text"
+        },
+        {
+          "name": "country",
+          "type": "char(2)"
+        },
+        {
+          "name": "is_default",
+          "type": "bool",
+          "default": "false"
+        }
       ]
     },
     {
-      "id": "order_item", "name": "order_items",
+      "id": "order",
+      "name": "orders",
+      "description": "One checkout. Immutable after payment.",
       "columns": [
-        { "name": "order_id", "type": "uuid", "pk": true, "fk": "order.id" },
-        { "name": "product_id", "type": "uuid", "pk": true, "fk": "product.id" },
-        { "name": "quantity", "type": "int" },
-        { "name": "unit_price_cents", "type": "int" }
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id"
+        },
+        {
+          "name": "shipping_address_id",
+          "type": "uuid",
+          "fk": "address.id",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "order_status"
+        },
+        {
+          "name": "total_cents",
+          "type": "int"
+        },
+        {
+          "name": "placed_at",
+          "type": "timestamptz"
+        }
       ]
     },
     {
-      "id": "product", "name": "products",
+      "id": "order_item",
+      "name": "order_items",
       "columns": [
-        { "name": "id", "type": "uuid", "pk": true },
-        { "name": "sku", "type": "text", "unique": true },
-        { "name": "name", "type": "text" },
-        { "name": "price_cents", "type": "int" },
-        { "name": "attributes", "type": "jsonb", "nullable": true }
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "pk": true,
+          "fk": "order.id"
+        },
+        {
+          "name": "product_id",
+          "type": "uuid",
+          "pk": true,
+          "fk": "product.id"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "unit_price_cents",
+          "type": "int"
+        }
       ]
     },
     {
-      "id": "payment", "name": "payments",
+      "id": "product",
+      "name": "products",
       "columns": [
-        { "name": "id", "type": "uuid", "pk": true },
-        { "name": "order_id", "type": "uuid", "fk": "order.id", "unique": true },
-        { "name": "provider", "type": "text" },
-        { "name": "provider_ref", "type": "text", "nullable": true },
-        { "name": "captured_at", "type": "timestamptz", "nullable": true }
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "sku",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "price_cents",
+          "type": "int"
+        },
+        {
+          "name": "attributes",
+          "type": "jsonb",
+          "nullable": true
+        }
       ]
     },
-    { "id": "order_status", "name": "order_status", "kind": "enum", "values": ["draft", "placed", "payment_failed", "paid", "shipped", "delivered", "cancelled"] }
+    {
+      "id": "payment",
+      "name": "payments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "fk": "order.id",
+          "unique": true
+        },
+        {
+          "name": "provider",
+          "type": "text"
+        },
+        {
+          "name": "provider_ref",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "captured_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "order_status",
+      "name": "order_status",
+      "kind": "enum",
+      "values": [
+        "draft",
+        "placed",
+        "payment_failed",
+        "paid",
+        "shipped",
+        "delivered",
+        "cancelled"
+      ]
+    }
   ],
   "relationships": [
-    { "id": "address-user", "from": "address", "to": "user", "from_column": "user_id", "to_column": "id", "label": "belongs to", "on_delete": "cascade" },
-    { "id": "order-user", "from": "order", "to": "user", "from_column": "user_id", "to_column": "id", "label": "placed by" },
-    { "id": "order-address", "from": "order", "to": "address", "from_column": "shipping_address_id", "to_column": "id", "to_cardinality": "zero-or-one", "label": "ships to", "identifying": false },
-    { "id": "item-order", "from": "order_item", "to": "order", "from_cardinality": "one-or-many", "from_column": "order_id", "to_column": "id" },
-    { "id": "item-product", "from": "order_item", "to": "product", "from_column": "product_id", "to_column": "id" },
-    { "id": "payment-order", "from": "payment", "to": "order", "from_cardinality": "zero-or-one", "from_column": "order_id", "to_column": "id", "label": "pays" }
+    {
+      "id": "address-user",
+      "from": "address",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "belongs to",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "order-user",
+      "from": "order",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "placed by"
+    },
+    {
+      "id": "order-address",
+      "from": "order",
+      "to": "address",
+      "from_column": "shipping_address_id",
+      "to_column": "id",
+      "to_cardinality": "zero-or-one",
+      "label": "ships to",
+      "identifying": false
+    },
+    {
+      "id": "item-order",
+      "from": "order_item",
+      "to": "order",
+      "from_cardinality": "one-or-many",
+      "from_column": "order_id",
+      "to_column": "id"
+    },
+    {
+      "id": "item-product",
+      "from": "order_item",
+      "to": "product",
+      "from_column": "product_id",
+      "to_column": "id"
+    },
+    {
+      "id": "payment-order",
+      "from": "payment",
+      "to": "order",
+      "from_cardinality": "zero-or-one",
+      "from_column": "order_id",
+      "to_column": "id",
+      "label": "pays"
+    }
   ],
   "cards": [
-    { "title": "Conventions", "tone": "info", "items": ["All ids are uuid v7", "Money is integer cents", "Timestamps are timestamptz in UTC"] },
-    { "title": "Watch out", "tone": "warning", "items": ["order_items has a composite PK", "payments.order_id is unique: one payment per order"] }
+    {
+      "title": "Conventions",
+      "tone": "info",
+      "items": [
+        "All ids are uuid v7",
+        "Money is integer cents",
+        "Timestamps are timestamptz in UTC"
+      ]
+    },
+    {
+      "title": "Watch out",
+      "tone": "warning",
+      "items": [
+        "order_items has a composite PK",
+        "payments.order_id is unique: one payment per order"
+      ]
+    }
   ]
 }

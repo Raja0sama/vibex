@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs.schema.json",
+  "title": "vibeX docs \u2014 the authoring contract",
+  "description": "What a person or agent WRITES. It holds only what cannot be computed: prose tied to code, and statements a human stands behind. Facts that can be derived from a diagram spec are never authored here \u2014 a section asks for a generator and the build derives them. See docs-graph.schema.json for what the build EMITS.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "diagram_type",
+    "meta",
+    "sections"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "diagram_type": {
+      "const": "docs"
+    },
+    "meta": {
+      "$ref": "common.schema.json#/$defs/meta"
+    },
+    "covers": {
+      "type": "array",
+      "description": "Spec ids this document documents, e.g. [\"shop.c4\", \"orders.erd\"]. Generators may only read specs listed here, so the coverage report can state exactly what was and was not looked at.",
+      "items": {
+        "$ref": "common.schema.json#/$defs/id"
+      }
+    },
+    "review_window_days": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 180,
+      "description": "How long an asserted claim stays trusted before the build downgrades it to `expired`. Shorter for fast-moving areas."
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Reading order for humans. Agents read the flat claim list instead, so section order carries no meaning for them.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "description": "One sentence on what the section answers. Not a claim: never rendered as fact, never cited."
+          },
+          "claims": {
+            "type": "array",
+            "description": "Ids of authored claims to render here, in this order.",
+            "items": {
+              "$ref": "common.schema.json#/$defs/id"
+            }
+          },
+          "generate": {
+            "type": "array",
+            "description": "Derived content to compute into this section. A fixed set: the agent chooses WHICH facts appear, never what they say.",
+            "items": {
+              "enum": [
+                "erd.entities",
+                "erd.relationships",
+                "c4.elements",
+                "c4.relationships",
+                "c4.boundaries",
+                "endpoints.operations",
+                "endpoints.types",
+                "lifecycle.states",
+                "lifecycle.transitions",
+                "coverage"
+              ]
+            }
+          },
+          "narrative": {
+            "type": "string",
+            "description": "Markdown prose for this section, so the document reads as a document. Cite a claim with [[claim-id]]: the citation resolves to that claim and carries its confidence, and the build fails if it does not resolve. Prose is not evidence \u2014 every load-bearing statement in it should carry a citation, and the claims it cites render below it as the section's evidence. Supported: headings, paragraphs, lists, blockquotes, fenced code, tables, horizontal rules, and inline bold/italic/code/link. Raw HTML is escaped, never rendered."
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "description": "One claim = one assertion. If a sentence contains an `and` joining two independent facts, it is two claims. This is what makes a claim individually citable, individually checkable, and individually retractable.",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "description": "Domain words whose meaning is not guessable from the code. Agents use this to map user wording onto spec ids.",
+      "items": {
+        "type": "object",
+        "required": [
+          "term",
+          "definition"
+        ],
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain English, no jargon that is not itself in the glossary."
+          },
+          "see": {
+            "$ref": "#/$defs/ref",
+            "description": "The thing in a diagram this word names."
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "The document's own boundary, stated up front. A doc that admits what it does not cover is trusted where it does.",
+      "properties": {
+        "out_of_scope": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "area",
+              "reason"
+            ],
+            "properties": {
+              "area": {
+                "type": "string",
+                "description": "e.g. \"deployment\", \"auth token issuance\""
+              },
+              "reason": {
+                "type": "string",
+                "description": "Why it is absent and where to look instead. \"Not documented yet\" is a valid reason; silence is not."
+              }
+            }
+          }
+        }
+      }
+    },
+    "cards": {
+      "$ref": "common.schema.json#/$defs/cards"
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]*(#[a-zA-Z][a-zA-Z0-9_.-]*)?$",
+      "description": "Address of a thing in another spec: `<spec-id>` or `<spec-id>#<node-id>`, e.g. `shop.c4#bff`, `orders.erd#orders`. Same shape as the viewer's deep links, so a ref pastes straight into a URL."
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "text",
+        "source"
+      ],
+      "description": "A single checkable statement. Note there is no `confidence` field: you declare your evidence, the build computes how far it can be trusted. Declaring your own confidence is how documentation starts lying.",
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "Stable and addressable. Agents cite this id; changing it breaks those citations, so supersede instead of rename."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One sentence of plain English, present tense, stating what IS. No hedging (\"probably\", \"should\"), no history (\"we used to\"), no instructions (\"you should\") \u2014 those are not claims about the system."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "subject": {
+          "$ref": "#/$defs/ref",
+          "description": "What the claim is about. Puts the claim on that node's page in the docs, and answers an agent asking \"what do you know about X\"."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supersedes": {
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "Id of a claim this replaces. The old claim stays in the graph marked superseded, so a stale citation resolves to a tombstone rather than nothing."
+        }
+      }
+    },
+    "source": {
+      "description": "Where the claim's authority comes from. Only two kinds may be authored; `derived` is emitted by the build and is invalid here.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/anchored"
+        },
+        {
+          "$ref": "#/$defs/asserted"
+        }
+      ]
+    },
+    "anchored": {
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "hash"
+      ],
+      "description": "Prose about code, pinned to the code it describes. When that code changes the claim is flagged for re-reading \u2014 it is not silently assumed still true, and not silently assumed false either.",
+      "properties": {
+        "kind": {
+          "const": "anchored"
+        },
+        "path": {
+          "type": "string",
+          "description": "Repo-relative POSIX path: no leading slash, drive letter, URL scheme, or \"..\" segment."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Class, function, or export the claim is about. Used in the source link and in the failure message when the anchor breaks."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{12}$",
+          "description": "First 12 hex chars of the SHA-256 of the anchored region: the selected lines (whole file when line is absent), each line's whitespace runs collapsed to one space and trimmed, joined with \\n. Whitespace-insensitive so a reformat does not cry wolf, content-sensitive so a real edit does."
+        }
+      }
+    },
+    "asserted": {
+      "type": "object",
+      "required": [
+        "kind",
+        "by",
+        "at"
+      ],
+      "description": "Something a person decided, which no file can prove: ownership, rationale, a deliberate trade-off. Always rendered as someone's statement, never as a system fact.",
+      "properties": {
+        "kind": {
+          "const": "asserted"
+        },
+        "by": {
+          "type": "string",
+          "description": "Who stands behind it. A person or team, not \"the docs\" and not a model name."
+        },
+        "at": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO date (YYYY-MM-DD) this was last confirmed true \u2014 not when it was first written. Re-confirming is an edit to this field."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why, when the why is the point. Kept separate from `text` so the claim stays one sentence."
+        }
+      }
+    }
+  }
+}

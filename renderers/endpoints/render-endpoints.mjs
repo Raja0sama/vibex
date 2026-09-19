@@ -58,7 +58,7 @@ function groupCardHeight(endpoints, withSummary) {
 function renderGroupCard(group, endpoints, x, y, w, withSummary) {
   const h = groupCardHeight(endpoints, withSummary);
   let out = `<g class="ep-card" data-group-id="${esc(group.id)}" data-node-id="${esc(group.id)}" data-node-label="${esc(group.label)}" data-node-kind="group">`;
-  out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${HEAD_H - 8} h${-w} z"/>`;
   out += `<line x1="${x}" y1="${y + HEAD_H}" x2="${x + w}" y2="${y + HEAD_H}" style="stroke:var(--border)"/>`;
   const countText = `${endpoints.length} endpoint${endpoints.length === 1 ? '' : 's'}`;
@@ -83,7 +83,7 @@ function renderTypeCard(type, x, y, w) {
   const h = typeCardHeight(type);
   let out = `<g${nodeAttrs(type.id, type.name, { class: 'node type-card', kind: `type-${type.kind || 'object'}` })}>`;
   out += `<title>${esc(type.name)}${type.description ? ` — ${esc(type.description)}` : ''}</title>`;
-  out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${TYPE_HEAD_H - 8} h${-w} z"/>`;
   out += `<line x1="${x}" y1="${y + TYPE_HEAD_H}" x2="${x + w}" y2="${y + TYPE_HEAD_H}" style="stroke:var(--border)"/>`;
   out += svgText(x + 10, y + 22, truncate(type.name, fitChars(w - 80, 13)), { cls: 'title' });
@@ -173,7 +173,7 @@ export function renderEndpoints(spec) {
   const width = MARGIN * 2 + columns * cardW + (columns - 1) * GAP;
   const height = y + MARGIN;
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
-  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'endpoints' });
+  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'endpoints', proposed: spec.meta.proposed === true });
   const present = new Set(spec.endpoints.map((e) => e.method));
   const legend = METHOD_ORDER.filter((m) => present.has(m)).map((m) => ({ label: m, style: `background:var(--${m === 'HEAD' || m === 'OPTIONS' ? 'other' : m.toLowerCase()})` }));
   if (spec.endpoints.some((e) => e.auth && e.auth !== 'none')) legend.push({ label: '🔒 auth required', className: 'text' });

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs-lock.schema.json",
+  "title": "vibeX docs lock — what the last check established",
+  "description": "Written next to the docs spec and committed with it. It lets a build re-read only the anchors whose files git says have moved, and it carries the commit each claim last verified at so that fact survives a build which reused the result. Not hand-written; delete it to force a full check.",
+  "type": "object",
+  "required": ["schema_version", "artifact", "claims"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "artifact": { "const": "docs-lock" },
+    "commit": { "type": ["string", "null"], "description": "HEAD when this lock was written. The next build diffs against it; if it cannot (unknown commit, shallow clone, rewritten history) it re-checks everything." },
+    "checked_at": { "type": ["string", "null"], "format": "date-time" },
+    "claims": {
+      "type": "object",
+      "description": "One entry per anchored claim. Assertions are not here: they go stale on a clock, not on a file.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["state", "hash"],
+        "properties": {
+          "state": { "enum": ["match", "changed", "missing"] },
+          "hash": { "type": "string", "description": "The hash the spec declared when this entry was written. If the spec's hash differs now, the claim was re-anchored or rewritten and is re-checked regardless of what git says." },
+          "commit": { "type": ["string", "null"], "description": "The commit this claim last verified at, carried forward across builds that reused it." },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "diagram_type": "docs",
+  "meta": {
+    "id": "shop.docs",
+    "title": "Shop platform",
+    "subtitle": "What the system is, what it guarantees, and what this document does not cover"
+  },
+  "covers": [
+    "shop.c4",
+    "orders.erd",
+    "shop.endpoints"
+  ],
+  "review_window_days": 180,
+  "sections": [
+    {
+      "id": "overview",
+      "title": "What this system is",
+      "summary": "The shape of the platform and who it serves.",
+      "claims": [
+        "shop.purpose",
+        "shop.ownership"
+      ],
+      "generate": [
+        "c4.elements"
+      ],
+      "narrative": "The Shop platform sells physical products to customers and gives ops staff a back-office for the catalogue and refunds [[shop.purpose]]. Two frontends talk to a single backend-for-frontend, which fans out to the domain APIs behind it.\n\nOwnership follows the deploy boundary: the web team owns the two frontends, the platform team owns the BFF and everything behind it [[shop.ownership]]. A frontend release therefore never requires a backend release.\n\nThe elements below are derived from the container diagram, so this list cannot drift from it."
+    },
+    {
+      "id": "boundaries",
+      "title": "Trust boundaries",
+      "summary": "What runs where, and what each side is allowed to assume about the other.",
+      "claims": [
+        "bff.session-owner",
+        "bff.forwards-identity",
+        "bff.no-token-issue",
+        "network.public-entry",
+        "network.private-isolated"
+      ],
+      "generate": [
+        "c4.boundaries",
+        "c4.relationships"
+      ],
+      "narrative": "There is exactly one way in. The BFF is the only container reachable from the public internet [[network.public-entry]], and nothing inside the private network accepts connections from outside it [[network.private-isolated]].\n\nAuthentication lives entirely at that edge. The BFF issues and validates browser sessions [[bff.session-owner]] and forwards a verified user id inward on every request [[bff.forwards-identity]]. The domain APIs behind it trust that header and never issue or verify tokens themselves [[bff.no-token-issue]].\n\n> Two consequences worth holding onto: a domain API reached by any route other than the BFF has\n> no authentication at all, and a session bug is a single-service bug."
+    },
+    {
+      "id": "data",
+      "title": "Data model",
+      "summary": "Tables, keys, and the rules that are enforced in the database rather than in code.",
+      "claims": [
+        "orders.single-writer",
+        "money.integer-cents"
+      ],
+      "generate": [
+        "erd.entities",
+        "erd.relationships"
+      ],
+      "narrative": "Seven tables, split between an identity group and a commerce group.\n\nTwo conventions are enforced rather than agreed. Every money column stores an integer number of cents [[money.integer-cents]], which is why totals can be summed without rounding drift. And the `orders` table has exactly one writer, the Order API [[orders.single-writer]] \u2014 the Catalogue API reads it through a view and holds no write access.\n\nEverything below is read off the ERD spec: column counts, keys, cardinalities and delete rules."
+    },
+    {
+      "id": "api",
+      "title": "API surface",
+      "summary": "Every operation the frontends can call.",
+      "generate": [
+        "endpoints.operations"
+      ],
+      "narrative": "Ten operations, all reached through the BFF. The list is generated from the endpoint spec, so a route added in code and imported here shows up without anyone editing this page.\n\n`POST /webhooks/stripe` is the exception to the one-way-in rule: Stripe calls it directly, and it authenticates the caller by signature rather than by session [[webhook.signature-auth]]."
+    },
+    {
+      "id": "coverage",
+      "title": "What this document does not cover",
+      "generate": [
+        "coverage"
+      ],
+      "narrative": "Read this before trusting an absence. Something missing here is either out of scope below, listed as noticed-and-unaccounted-for, or nobody has looked."
+    }
+  ],
+  "claims": [
+    {
+      "id": "shop.purpose",
+      "text": "The platform sells physical products to customers and lets ops staff manage the catalogue and refunds.",
+      "subject": "shop.c4",
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19"
+      }
+    },
+    {
+      "id": "shop.ownership",
+      "text": "The web team owns the two frontends and the platform team owns the BFF and the domain APIs.",
+      "subject": "shop.c4",
+      "tags": [
+        "ownership"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19",
+        "rationale": "Split along the deploy boundary so a frontend release never requires a backend release."
+      }
+    },
+    {
+      "id": "bff.session-owner",
+      "text": "The BFF issues and validates browser sessions.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/session.service.ts",
+        "symbol": "SessionService",
+        "line": 10,
+        "end_line": 25,
+        "hash": "59103dffa873"
+      }
+    },
+    {
+      "id": "bff.forwards-identity",
+      "text": "The BFF forwards a verified user id to the domain APIs on every request.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/identity.interceptor.ts",
+        "symbol": "IdentityInterceptor",
+        "hash": "e12859b083fa"
+      }
+    },
+    {
+      "id": "bff.no-token-issue",
+      "text": "The domain APIs trust the forwarded user id and never issue or verify tokens themselves.",
+      "subject": "shop.c4#order_api",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "order-api/src/auth/identity.guard.ts",
+        "symbol": "IdentityGuard",
+        "hash": "750754a1ffff"
+      }
+    },
+    {
+      "id": "network.public-entry",
+      "text": "The BFF is the only container reachable from the public internet.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth",
+        "network"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19"
+      }
+    },
+    {
+      "id": "network.private-isolated",
+      "text": "Nothing inside the private network accepts connections from outside it.",
+      "subject": "shop.c4#backend",
+      "tags": [
+        "auth",
+        "network"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19"
+      }
+    },
+    {
+      "id": "orders.single-writer",
+      "text": "The Order API is the only service that writes to the orders table.",
+      "subject": "orders.erd#order",
+      "tags": [
+        "data"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "order-api/src/orders/orders.repository.ts",
+        "symbol": "OrdersRepository",
+        "hash": "b6336af68c3d"
+      }
+    },
+    {
+      "id": "money.integer-cents",
+      "text": "Every money column stores an integer number of cents, never a decimal or a float.",
+      "subject": "orders.erd",
+      "tags": [
+        "data",
+        "convention"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19",
+        "rationale": "Avoids rounding drift when totals are summed across line items."
+      }
+    },
+    {
+      "id": "webhook.signature-auth",
+      "text": "The Stripe webhook endpoint authenticates its caller by verifying the Stripe signature header, not a session.",
+      "subject": "shop.endpoints#stripe-webhook",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "order-api/src/payments/stripe-webhook.controller.ts",
+        "symbol": "StripeWebhookController",
+        "hash": "0f9d5e1b22aa"
+      }
+    }
+  ],
+  "glossary": [
+    {
+      "term": "BFF",
+      "definition": "Backend for frontend: the one service the browser talks to, which fans out to the domain APIs.",
+      "see": "shop.c4#bff"
+    },
+    {
+      "term": "Domain event",
+      "definition": "A message published after a change is committed, which other services react to without the publisher knowing about them.",
+      "see": "shop.c4#events"
+    }
+  ],
+  "coverage": {
+    "out_of_scope": [
+      {
+        "area": "Deployment and infrastructure",
+        "reason": "Owned by the platform team and documented in their runbook; nothing here describes how these containers are deployed."
+      },
+      {
+        "area": "Stripe and SendGrid internals",
+        "reason": "Third-party systems. This document covers only what the platform sends them and expects back."
+      },
+      {
+        "area": "Search indexing",
+        "reason": "Not documented yet. The Catalogue API maintains a search index and no claim here describes how."
+      }
+    ]
+  }
+}

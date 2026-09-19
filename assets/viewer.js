@@ -208,6 +208,35 @@
       var href = String(repo.url).replace(/\/+$/, '') + '/blob/' + encodeURIComponent(repo.revision || 'HEAD') + '/' + segs + (s.line ? '#L' + s.line + (s.end_line ? '-L' + s.end_line : '') : '');
       return '<a href="' + h(href) + '" target="_blank" rel="noopener noreferrer">' + h(text) + '</a>';
     }
+    // Noticing something wrong while looking at a node is the moment worth
+    // catching. The link carries which spec and which node, so whoever picks
+    // the issue up does not have to reconstruct where the reader was standing.
+    function intakeLink(item, id, collection) {
+      var repo = spec.meta && spec.meta.repository;
+      var url = repo && String(repo.url || '');
+      if (!url || !/^https?:\/\/(www\.)?(github|gitlab)\.com\//i.test(url)) return '';
+      var gitlab = /gitlab\.com/i.test(url);
+      var clean = url.replace(/\/+$/, '').replace(/\.git$/, '');
+      var specId = (spec.meta && spec.meta.id) || spec.diagram_type;
+      var label = item.label || item.name || item.path || id;
+
+      var body = 'What is missing or wrong:\n\n\n\n---\n\n'
+        + 'Context, filled in automatically. Leave it in — it is how this gets picked up.\n\n'
+        + '```vibex\nintent: spec-gap\nspec: ' + specId + '#' + id + '\nkind: ' + (collection || '') + '\nlabel: ' + label
+        + (repo.revision ? '\ncommit: ' + repo.revision : '') + '\n```';
+      var title = label + ' — something is missing or wrong';
+
+      var href = gitlab
+        ? clean + '/-/issues/new?issue%5Btitle%5D=' + encodeURIComponent(title) + '&issue%5Bdescription%5D=' + encodeURIComponent(body)
+        : clean + '/issues/new?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body) + '&labels=spec,intake';
+
+      return '<a class="flag" href="' + h(href) + '" target="_blank" rel="noopener noreferrer"'
+        + ' title="Something missing or wrong here? File it, with the context already filled in.">'
+        + '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M5 21V5.5a1 1 0 0 1 .6-.9C7 4 9 4 12 5.2s5 1.2 6.4.6a1 1 0 0 1 1.6.9v7.7a1 1 0 0 1-.6.9c-1.4.6-3.4.6-6.4-.6s-5-1.2-6.4-.6"/>'
+        + '</svg><span>Report something about this</span></a>';
+    }
+
     function table(rows, keys) {
       if (!rows || !rows.length) return '';
       // Only show columns some row actually fills; the panel is narrow.
@@ -293,6 +322,7 @@
       }
       if (item.sources && item.sources.length) out += '<h4>Source</h4><div class="d-desc">' + item.sources.map(sourceLink).join('<br>') + '</div>';
       if (out.length === before && !dl && !item.description && !item.summary) out += '<p class="empty">No further details in the spec.</p>';
+      out += intakeLink(item, id, entry.collection);
       details.innerHTML = out;
     }
     details.addEventListener('click', function (e) {

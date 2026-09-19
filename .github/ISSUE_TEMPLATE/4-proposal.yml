@@ -1,0 +1,32 @@
+name: Propose something that does not exist
+description: Describe a change to the system so it can be drawn and argued about before anyone builds it.
+title: "Proposal: "
+labels: [proposal, intake]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This produces a **proposal**: a diagram and document marked, everywhere they
+        appear, as describing something that does not exist. They are never checked
+        against code, because there is none.
+  - type: textarea
+    id: what
+    attributes:
+      label: What are you proposing?
+      placeholder: A second region, so an outage in one does not stop the other.
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: What problem does it solve?
+    validations: { required: true }
+  - type: textarea
+    id: unknowns
+    attributes:
+      label: What have you not worked out?
+      description: This becomes the proposal's "what this does not cover" section, which is the part that makes it honest.
+  - type: textarea
+    id: vibex
+    attributes:
+      label: Context
+      render: vibex

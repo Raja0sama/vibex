@@ -127,37 +127,89 @@ export function rectContains(outer, inner) {
 export function routeOrthogonal(a, b, offset = 0) {
   const fo = typeof offset === 'object' ? offset.from : offset;
   const to_ = typeof offset === 'object' ? offset.to : offset;
+  // `channel` slides the turning segment along the gap so edges crossing the
+  // same gap do not all jog on one line. See channelOffsets below.
+  const ch = (typeof offset === 'object' && Number.isFinite(offset.channel)) ? offset.channel : 0;
   const ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
   const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
   const gap = 24;
+  // Keep the turn off both box edges however far the channel pushes it.
+  const inGap = (v, lo, hi) => Math.max(lo + 12, Math.min(v, hi - 12));
   let points;
-  let fromSide; let toSide;
+  let fromSide; let toSide; let corridor = null;
   if (b.x >= a.x + a.w + gap) {
     fromSide = 'right'; toSide = 'left';
     const ay = ac.y + fo; const by = bc.y + to_;
-    const midX = (a.x + a.w + b.x) / 2;
+    const midX = inGap((a.x + a.w + b.x) / 2 + ch, a.x + a.w, b.x);
+    corridor = { axis: 'x', start: a.x + a.w, end: b.x };
     points = [[a.x + a.w, ay], [midX, ay], [midX, by], [b.x, by]];
   } else if (a.x >= b.x + b.w + gap) {
     fromSide = 'left'; toSide = 'right';
     const ay = ac.y + fo; const by = bc.y + to_;
-    const midX = (b.x + b.w + a.x) / 2;
+    const midX = inGap((b.x + b.w + a.x) / 2 + ch, b.x + b.w, a.x);
+    corridor = { axis: 'x', start: b.x + b.w, end: a.x };
     points = [[a.x, ay], [midX, ay], [midX, by], [b.x + b.w, by]];
   } else if (b.y >= a.y + a.h) {
     fromSide = 'bottom'; toSide = 'top';
     const ax = ac.x + fo; const bx = bc.x + to_;
-    const midY = (a.y + a.h + b.y) / 2;
+    const midY = inGap((a.y + a.h + b.y) / 2 + ch, a.y + a.h, b.y);
+    corridor = { axis: 'y', start: a.y + a.h, end: b.y };
     points = [[ax, a.y + a.h], [ax, midY], [bx, midY], [bx, b.y]];
   } else if (a.y >= b.y + b.h) {
     fromSide = 'top'; toSide = 'bottom';
     const ax = ac.x + fo; const bx = bc.x + to_;
-    const midY = (b.y + b.h + a.y) / 2;
+    const midY = inGap((b.y + b.h + a.y) / 2 + ch, b.y + b.h, a.y);
+    corridor = { axis: 'y', start: b.y + b.h, end: a.y };
     points = [[ax, a.y], [ax, midY], [bx, midY], [bx, b.y + b.h]];
   } else {
     // Overlapping rects: draw a straight line between centers.
     fromSide = 'center'; toSide = 'center';
     points = [[ac.x, ac.y], [bc.x, bc.y]];
   }
-  return { points: dedupe(points), fromSide, toSide };
+  return { points: dedupe(points), fromSide, toSide, corridor };
+}
+
+// Edges crossing the same gap all turn at its midpoint, so their turning
+// segments — and the labels that sit on them — pile up on one line. Give each
+// one its own lane, but only where lanes are actually needed: two turns that do
+// not overlap along the gap can share a lane without touching.
+export function channelOffsets(edges, rects, ports = null) {
+  const out = edges.map(() => 0);
+  const groups = new Map();
+  edges.forEach((e, i) => {
+    const a = rects.get(e.from); const b = rects.get(e.to);
+    if (!a || !b || e.from === e.to) return;
+    const r = routeOrthogonal(a, b, ports ? ports[i] : 0);
+    if (!r.corridor || r.points.length < 4) return;
+    const [p1, p2] = [r.points[1], r.points[2]];
+    const span = r.corridor.axis === 'x' ? [p1[1], p2[1]] : [p1[0], p2[0]];
+    const key = `${r.corridor.axis}:${Math.round(r.corridor.start)}:${Math.round(r.corridor.end)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ i, corridor: r.corridor, lo: Math.min(...span), hi: Math.max(...span) });
+  });
+
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    // Greedy interval colouring: walk the turns in order and reuse the first
+    // lane whose previous occupant has already ended.
+    list.sort((p, q) => p.lo - q.lo || p.i - q.i);
+    const laneEnds = [];
+    for (const it of list) {
+      // Need real clearance, not just a shared endpoint, or two turns read as one line.
+      let lane = laneEnds.findIndex((end) => end <= it.lo - 10);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(0); }
+      laneEnds[lane] = it.hi;
+      it.lane = lane;
+    }
+    const lanes = laneEnds.length;
+    if (lanes < 2) continue;
+    const { start, end } = list[0].corridor;
+    const room = Math.abs(end - start) - 28;
+    if (room <= 8) continue;
+    const step = Math.min(34, room / (lanes - 1));
+    for (const it of list) out[it.i] = (it.lane - (lanes - 1) / 2) * step;
+  }
+  return out;
 }
 
 // Self-referencing edge: small loop on the right side of the rect.

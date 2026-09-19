@@ -1,0 +1,112 @@
+name: intake
+
+# Someone filed a request from a diagram or a doc. Decide whether it can be
+# acted on, and say so on the issue either way — an intake queue that answers
+# nothing is worse than no intake queue.
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    if: contains(join(github.event.issue.labels.*.name, ','), 'intake')
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.decide.outputs.action }}
+      intent: ${{ steps.decide.outputs.intent }}
+      playbook: ${{ steps.decide.outputs.playbook }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: decide
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+        run: node .github/scripts/triage-issue.mjs showcase
+
+      - name: say what happens next
+        if: steps.decide.outputs.reply != ''
+        uses: actions/github-script@v7
+        env:
+          REPLY: ${{ steps.decide.outputs.reply }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: process.env.REPLY,
+            });
+
+      - name: label what it needs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const action = '${{ steps.decide.outputs.action }}';
+            const label = action === 'ask' ? 'needs-info' : action === 'act' ? 'ready' : null;
+            if (!label) return;
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: [label],
+            });
+
+  # The authoring step. It runs only once triage says the request is actionable,
+  # and only if an API key is configured — without one the queue still triages
+  # and answers, it just does not write anything.
+  author:
+    needs: triage
+    if: needs.triage.outputs.action == 'act'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: check for a key
+        id: key
+        run: echo "present=${{ secrets.ANTHROPIC_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: explain that nothing will be written
+        if: steps.key.outputs.present != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+              body: 'This request is actionable, but no `ANTHROPIC_API_KEY` is configured, so nothing will be written automatically. It is labelled `ready` for a person to pick up.',
+            });
+
+      # Configure ANTHROPIC_API_KEY to turn this on. The agent reads SKILL.md,
+      # which already forbids inventing an asserted claim and requires the
+      # drift check to pass — and it opens a pull request, never a merge.
+      - name: write it
+        if: steps.key.outputs.present == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Follow SKILL.md in this repository.
+
+            ${{ needs.triage.outputs.playbook }}
+
+            The request is GitHub issue #${{ github.event.issue.number }}. Read it, including
+            the fenced `vibex` block, which names exactly which claim, spec or node the
+            reader was looking at.
+
+            Before you finish, run:
+              node bin/vibex.mjs validate <every spec you touched>
+              node bin/vibex.mjs docs <the docs spec> <dir> --repo . --check --no-lock
+
+            Open a pull request that closes the issue. Do not merge it. If you could not
+            establish something from the code, say so in coverage.out_of_scope rather than
+            asserting it in anyone's name.

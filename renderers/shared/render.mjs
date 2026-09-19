@@ -20,6 +20,12 @@ export function embeddable(spec, result) {
 export function renderSpec(spec) {
   const report = validateSpec(spec);
   if (!report.ok) return { report, html: null, warnings: [] };
+  // A valid spec is not necessarily a drawable one: `docs` renders into the
+  // dashboard, not to a standalone diagram.
+  if (!RENDERERS[spec.diagram_type]) {
+    report.error('not-a-diagram', `diagram_type "${spec.diagram_type}" has no diagram renderer; build it with "vibex docs" or include it in a dashboard`, 'diagram_type');
+    return { report, html: null, warnings: [] };
+  }
   const template = loadTemplate();
   const result = RENDERERS[spec.diagram_type](spec);
   const html = applyTemplate(template, { spec, svg: result.svg, legend: result.legend, embedSpec: embeddable(spec, result) });

@@ -34,6 +34,58 @@ jobs:
           node bin/vibex.mjs demo out 2> stderr.txt
           if grep -qi 'warning' stderr.txt; then cat stderr.txt; exit 1; fi
 
+  docs-drift:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: a shallow clone cannot diff against the commit a lock
+      # file names, and a check that silently degrades is worse than none.
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # --no-lock on purpose. The lock file is an optimisation for local
+      # iteration; it arrives here from a contributor's machine and asserts
+      # that claims were verified. CI re-reads every anchor from scratch
+      # rather than taking that on trust. It costs milliseconds.
+      - name: every claim must still hold against the code
+        run: |
+          status=0
+          for spec in examples/*.docs.json; do
+            echo "::group::$spec"
+            node bin/vibex.mjs docs "$spec" examples \
+              --repo examples/shop-repo --check --no-lock -o /dev/null || status=1
+            echo "::endgroup::"
+          done
+          if [ $status -ne 0 ]; then
+            echo "::error::Documentation has drifted from the code."
+            echo "A claim is stale, broken, or out of date. Do not re-anchor blindly:"
+            echo "  1. read the code the claim points at"
+            echo "  2. still true  -> vibex docs <spec> <dir> --repo . --reanchor"
+            echo "  3. no longer   -> rewrite the claim, or supersede it"
+            exit 1
+          fi
+
+      # The showcase is published publicly, so it is held to the same bar.
+      - name: the public showcase must hold too
+        run: |
+          status=0
+          for spec in showcase/*.docs.json; do
+            node bin/vibex.mjs docs "$spec" showcase --repo showcase --check --no-lock -o /dev/null || status=1
+          done
+          [ $status -eq 0 ] || { echo "::error::the published demo contains a claim that no longer holds"; exit 1; }
+
+      - name: the markdown copy must stay free of raw HTML
+        run: |
+          node bin/vibex.mjs docs examples/auth.docs.json examples \
+            --repo examples/shop-repo --no-lock --md doc.md -o /dev/null
+          if grep -qE '</?[a-zA-Z][^>]*>' doc.md; then
+            echo "::error::Raw HTML in the Markdown export would not render in Confluence or a wiki."
+            grep -nE '</?[a-zA-Z][^>]*>' doc.md
+            exit 1
+          fi
+
   pack:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +96,31 @@ jobs:
       - name: tarball must ship every runtime asset
         run: |
           npm pack --dry-run --json > pack.json
-          for f in bin/vibex.mjs assets/template.html assets/dashboard.html assets/viewer.js assets/viewer.css schemas/erd.schema.json examples/orders.erd.json SKILL.md LICENSE; do
+          for f in bin/vibex.mjs assets/template.html assets/dashboard.html assets/viewer.js assets/viewer.css \
+                   schemas/erd.schema.json schemas/docs.schema.json schemas/docs-graph.schema.json \
+                   renderers/docs/graph.mjs renderers/docs/facts.mjs renderers/docs/anchors.mjs \
+                   examples/orders.erd.json examples/shop.docs.json SKILL.md LICENSE; do
             grep -q "\"path\": *\"$f\"" pack.json || { echo "missing from tarball: $f"; exit 1; }
           done
+
+      # A file list only catches what someone remembered to list. Install the
+      # tarball and run it: the demo is the first thing a new user sees, and it
+      # must not open on a wall of unverifiable claims in a tool whose pitch is
+      # documentation you can trust.
+      - name: the packed tarball must work from a clean install
+        run: |
+          npm pack --pack-destination /tmp/pkg
+          mkdir -p /tmp/install && tar xzf /tmp/pkg/*.tgz -C /tmp/install
+          cd /tmp/install/package
+          node bin/vibex.mjs demo out
+          node -e '
+            const html = require("fs").readFileSync("out/dashboard.html", "utf8");
+            const count = (re) => (html.match(re) || []).length;
+            const broken = count(/conf broken/g);
+            const verified = count(/conf verified/g);
+            const panels = count(/<section class="panel docs"/g);
+            console.log(`verified ${verified}, unverifiable ${broken}, docs panels ${panels}`);
+            if (!panels) { console.error("::error::the packed demo rendered no documentation panel"); process.exit(1); }
+            if (!verified) { console.error("::error::the packed demo verified nothing"); process.exit(1); }
+            if (broken) { console.error(`::error::${broken} unverifiable claims in the packed demo — an anchored file is missing from the tarball`); process.exit(1); }
+          '

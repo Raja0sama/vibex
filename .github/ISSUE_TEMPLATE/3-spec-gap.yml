@@ -1,0 +1,23 @@
+name: Something is missing from a diagram
+description: A table, service, endpoint or state that exists in the code but not in the diagram.
+title: "Missing: "
+labels: [spec, intake]
+body:
+  - type: textarea
+    id: missing
+    attributes:
+      label: What is missing or wrong?
+      placeholder: The disputes table is not in the ERD, and orders references it.
+    validations: { required: true }
+  - type: input
+    id: where
+    attributes:
+      label: Where does it live in the code?
+      description: A path helps enormously — it is what turns this into a change rather than a search.
+      placeholder: src/disputes/dispute.entity.ts
+  - type: textarea
+    id: vibex
+    attributes:
+      label: Context
+      description: Filled in automatically if you came from a diagram. Leave it as it is.
+      render: vibex

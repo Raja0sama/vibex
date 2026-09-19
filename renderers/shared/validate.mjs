@@ -28,6 +28,16 @@ export const ENUMS = {
     stateKind: ['initial', 'normal', 'waiting', 'terminal', 'failure'],
     transitionKind: ['normal', 'auto', 'timeout', 'failure'],
   },
+  docs: {
+    sourceKind: ['anchored', 'asserted'],
+    generator: [
+      'erd.entities', 'erd.relationships',
+      'c4.elements', 'c4.relationships', 'c4.boundaries',
+      'endpoints.operations', 'endpoints.types',
+      'lifecycle.states', 'lifecycle.transitions',
+      'coverage',
+    ],
+  },
   common: {
     theme: ['light', 'dark', 'auto'],
     tone: ['neutral', 'info', 'success', 'warning', 'danger'],
@@ -128,10 +138,28 @@ function checkSources(report, sources, at) {
   });
 }
 
+function checkProposal(report, meta) {
+  if (meta.proposed !== undefined && typeof meta.proposed !== 'boolean') {
+    report.error('type', 'meta.proposed must be true or false', 'meta.proposed');
+  }
+  if (meta.proposal === undefined) {
+    // A proposal with no trail is indistinguishable from an assertion nobody
+    // signed, which is the thing this flag exists to prevent.
+    if (meta.proposed) report.warn('untraced-proposal', 'meta.proposed is set but meta.proposal is missing; say where the proposal came from and who is making it', 'meta');
+    return;
+  }
+  if (!isObj(meta.proposal)) { report.error('type', 'meta.proposal must be an object', 'meta.proposal'); return; }
+  if (!meta.proposed) report.warn('proposal-without-flag', 'meta.proposal is set but meta.proposed is not true, so this renders as though it describes something real', 'meta');
+  if (meta.proposal.issue !== undefined && !isSafeLink(meta.proposal.issue)) {
+    report.error('link', 'meta.proposal.issue must be an http(s) URL or a relative path', 'meta.proposal.issue');
+  }
+}
+
 function checkCommon(report, spec) {
   if (spec.schema_version !== 1) report.error('schema_version', 'schema_version must be 1; add "schema_version": 1 at the top level', 'schema_version');
   if (!isObj(spec.meta)) { report.error('missing', 'meta is required', 'meta'); return; }
   if (typeof spec.meta.title !== 'string' || !spec.meta.title.trim()) report.error('missing', 'meta.title is required', 'meta.title');
+  checkProposal(report, spec.meta);
   checkEnum(report, spec.meta.theme, ENUMS.common.theme, 'meta.theme');
   if (spec.meta.repository !== undefined) {
     if (!isObj(spec.meta.repository) || typeof spec.meta.repository.url !== 'string') report.error('missing', 'meta.repository.url is required when repository is set', 'meta.repository');
@@ -428,16 +456,166 @@ export function validateLifecycle(spec, report = new Report()) {
   return report;
 }
 
-const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle };
+const REF_RE = /^[a-zA-Z][a-zA-Z0-9_.-]*(#[a-zA-Z][a-zA-Z0-9_.-]*)?$/;
+const HASH_RE = /^[0-9a-f]{12}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Hedges, instructions, and history are not claims about what the system IS.
+const NOT_A_CLAIM = /\b(should|probably|might|maybe|we used to|will be|TODO|TBD)\b/i;
 
-export const DIAGRAM_TYPES = Object.keys(VALIDATORS);
+function checkClaimSource(report, src, at) {
+  if (!isObj(src)) { report.error('missing', `${at}.source is required`, at); return; }
+  if (src.kind === 'derived') {
+    report.error('derived-authored', `${at}.source.kind is "derived"; derived facts are computed from a spec, never written by hand`, at);
+    return;
+  }
+  checkEnum(report, src.kind, ENUMS.docs.sourceKind, `${at}.source.kind`, false);
+
+  if (src.kind === 'anchored') {
+    if (typeof src.path !== 'string' || !src.path) report.error('missing', `${at}.source.path is required`, at);
+    else if (src.path.startsWith('/') || src.path.startsWith('\\') || SCHEME_RE.test(src.path) || src.path.split(/[\\/]/).some((seg) => seg === '..')) {
+      report.error('path', `${at}.source.path must be repo-relative (no leading slash, drive letter, scheme, or ".." segment)`, at);
+    }
+    if (typeof src.hash !== 'string' || !HASH_RE.test(src.hash)) {
+      report.error('hash', `${at}.source.hash must be 12 lowercase hex characters; run "vibex docs --reanchor" to compute it`, at);
+    }
+    for (const k of ['line', 'end_line']) {
+      if (src[k] !== undefined && (!Number.isInteger(src[k]) || src[k] < 1)) report.error('range', `${at}.source.${k} must be an integer >= 1`, at);
+    }
+    if (Number.isInteger(src.line) && Number.isInteger(src.end_line) && src.end_line < src.line) {
+      report.error('range', `${at}.source.end_line is before line`, at);
+    }
+  } else if (src.kind === 'asserted') {
+    if (typeof src.by !== 'string' || !src.by.trim()) report.error('missing', `${at}.source.by is required: name who stands behind this`, at);
+    if (typeof src.at !== 'string' || !DATE_RE.test(src.at)) report.error('date', `${at}.source.at must be an ISO date (YYYY-MM-DD) saying when this was last confirmed true`, at);
+    else if (Number.isNaN(Date.parse(src.at))) report.error('date', `${at}.source.at is not a real date`, at);
+  }
+}
+
+function validateDocs(spec, report) {
+  checkCommon(report, spec);
+  if (!Array.isArray(spec.sections) || !spec.sections.length) {
+    report.error('missing', 'sections is required and must list at least one section', 'sections');
+    return report;
+  }
+  const claims = Array.isArray(spec.claims) ? spec.claims : [];
+  if (spec.claims !== undefined && !Array.isArray(spec.claims)) report.error('type', 'claims must be an array', 'claims');
+
+  const claimIds = checkIds(report, claims, 'claims');
+  const sectionIds = checkIds(report, spec.sections, 'sections');
+
+  claims.forEach((c, i) => {
+    const at = `claims[${i}]`;
+    if (!isObj(c)) { report.error('type', `${at} must be an object`, at); return; }
+    if (typeof c.text !== 'string' || !c.text.trim()) report.error('missing', `${at}.text is required`, at);
+    else {
+      if (c.text.length > 300) report.warn('length', `${at}.text is ${c.text.length} characters; a claim is one sentence — split it`, at);
+      if (NOT_A_CLAIM.test(c.text)) report.warn('not-a-claim', `${at}.text hedges or instructs ("${c.text.match(NOT_A_CLAIM)[0]}"); state what is true, or move it to source.rationale`, at);
+      // ", and" or a semicolon almost always joins two independent clauses.
+      if (/,\s+and\b|;\s/.test(c.text)) {
+        report.warn('compound', `${at}.text reads as more than one assertion; one claim = one fact, so it can be checked, cited and retracted on its own`, at);
+      }
+    }
+    // A claim may not rate itself: confidence is computed from evidence.
+    if (c.confidence !== undefined) report.error('confidence-authored', `${at}.confidence is computed by the build from source and freshness; remove it`, at);
+    checkClaimSource(report, c.source, at);
+    if (spec.meta?.proposed && c.source?.kind === 'anchored') {
+      report.error('anchored-proposal', `${at} is anchored to code, but this document is marked proposed — there is nothing to anchor a proposal to. State it and say who is proposing it.`, at);
+    }
+    if (c.subject !== undefined && (typeof c.subject !== 'string' || !REF_RE.test(c.subject))) {
+      report.error('ref', `${at}.subject must look like "spec-id" or "spec-id#node-id" (got ${JSON.stringify(c.subject)})`, at);
+    }
+    if (c.supersedes !== undefined && !claimIds.has(c.supersedes)) {
+      report.error('dangling-ref', `${at}.supersedes "${c.supersedes}" is not a claim in this document`, at);
+    }
+    if (c.supersedes === c.id) report.error('ref', `${at}.supersedes points at itself`, at);
+  });
+
+  const placed = new Set();
+  spec.sections.forEach((s, i) => {
+    const at = `sections[${i}]`;
+    if (!isObj(s)) { report.error('type', `${at} must be an object`, at); return; }
+    if (typeof s.title !== 'string' || !s.title.trim()) report.error('missing', `${at}.title is required`, at);
+    for (const id of s.claims || []) {
+      if (!claimIds.has(id)) report.error('dangling-ref', `${at}.claims references unknown claim "${id}"`, at);
+      else placed.add(id);
+    }
+    (s.generate || []).forEach((g, k) => checkEnum(report, g, ENUMS.docs.generator, `${at}.generate[${k}]`, false));
+
+    if (s.narrative !== undefined) {
+      if (typeof s.narrative !== 'string') { report.error('type', `${at}.narrative must be a string of Markdown`, at); return; }
+      const cited = [...s.narrative.matchAll(/\[\[([a-zA-Z][a-zA-Z0-9_.-]*)\]\]/g)].map((m) => m[1]);
+      for (const id of cited) {
+        if (claimIds.has(id)) placed.add(id);
+        else report.error('dangling-ref', `${at}.narrative cites unknown claim "${id}"`, at);
+      }
+      // Prose with no citations is an opinion piece sitting inside a document
+      // whose whole point is that every statement is traceable.
+      if (!cited.length && s.narrative.trim().length > 200) {
+        report.warn('uncited-narrative', `${at}.narrative is ${s.narrative.trim().length} characters and cites no claim; load-bearing statements belong in claims the prose cites`, at);
+      }
+    }
+  });
+
+  for (const c of claims) {
+    if (isObj(c) && claimIds.has(c.id) && !placed.has(c.id) && !c.subject) {
+      report.warn('unplaced', `claim "${c.id}" is in no section and has no subject, so nothing will render it`, 'claims');
+    }
+  }
+
+  const covers = spec.covers;
+  if (covers !== undefined) {
+    if (!Array.isArray(covers)) report.error('type', 'covers must be an array of spec ids', 'covers');
+    else {
+      const known = new Set(covers);
+      for (const c of claims) {
+        if (!isObj(c) || typeof c.subject !== 'string') continue;
+        const specId = c.subject.split('#')[0];
+        if (!known.has(specId)) report.warn('uncovered-subject', `claim "${c.id}" is about "${specId}", which is not in covers; its subject cannot be resolved`, 'covers');
+      }
+    }
+  }
+
+  if (spec.review_window_days !== undefined && (!Number.isInteger(spec.review_window_days) || spec.review_window_days < 1)) {
+    report.error('range', 'review_window_days must be an integer >= 1', 'review_window_days');
+  }
+
+  (spec.glossary || []).forEach((g, i) => {
+    const at = `glossary[${i}]`;
+    if (!isObj(g)) { report.error('type', `${at} must be an object`, at); return; }
+    if (typeof g.term !== 'string' || !g.term.trim()) report.error('missing', `${at}.term is required`, at);
+    if (typeof g.definition !== 'string' || !g.definition.trim()) report.error('missing', `${at}.definition is required`, at);
+    if (g.see !== undefined && (typeof g.see !== 'string' || !REF_RE.test(g.see))) report.error('ref', `${at}.see must be a ref`, at);
+  });
+
+  const scope = spec.coverage?.out_of_scope;
+  if (scope !== undefined && !Array.isArray(scope)) report.error('type', 'coverage.out_of_scope must be an array', 'coverage');
+  else if (Array.isArray(scope)) {
+    scope.forEach((o, i) => {
+      const at = `coverage.out_of_scope[${i}]`;
+      if (!isObj(o) || typeof o.area !== 'string' || !o.area.trim()) report.error('missing', `${at}.area is required`, at);
+      if (!isObj(o) || typeof o.reason !== 'string' || !o.reason.trim()) report.error('missing', `${at}.reason is required: silence about a gap is what makes a document untrustworthy`, at);
+    });
+  }
+  if (!scope || !scope.length) {
+    report.warn('no-boundary', 'coverage.out_of_scope is empty; a document that does not say what it omits implies it covers everything', 'coverage');
+  }
+  if (!claims.length) report.warn('empty', 'no claims: this document will contain only derived facts', 'claims');
+  if (sectionIds.size !== spec.sections.length) report.error('duplicate-id', 'section ids must be unique', 'sections');
+  return report;
+}
+
+const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, docs: validateDocs };
+
+// Types that render to a diagram. `docs` is a spec but not a diagram.
+export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle'];
+export const SPEC_TYPES = Object.keys(VALIDATORS);
 
 export function validateSpec(spec) {
   const report = new Report();
   if (!isObj(spec)) { report.error('type', 'spec must be a JSON object', ''); return report; }
   const type = spec.diagram_type;
   if (!VALIDATORS[type]) {
-    report.error('diagram_type', `diagram_type must be one of ${DIAGRAM_TYPES.join(', ')} (got ${JSON.stringify(type)})`, 'diagram_type');
+    report.error('diagram_type', `diagram_type must be one of ${SPEC_TYPES.join(', ')} (got ${JSON.stringify(type)})`, 'diagram_type');
     return report;
   }
   try {

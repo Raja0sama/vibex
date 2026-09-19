@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "diagram_type": "docs",
+  "meta": {
+    "id": "auth.docs",
+    "title": "How authentication works",
+    "subtitle": "Where identity is established, what is trusted downstream, and the two things that bypass it"
+  },
+  "covers": [
+    "shop.c4",
+    "shop.endpoints"
+  ],
+  "review_window_days": 90,
+  "sections": [
+    {
+      "id": "edge",
+      "title": "Where identity is established",
+      "narrative": "Authentication happens in exactly one place. The BFF issues an opaque session token and keeps the user id against it server-side [[session.issued-by-bff]]; the token itself carries no claims, so there is nothing in it to forge or decode.\n\nA session lasts twelve hours from the moment it is issued [[session.ttl]], and can be ended immediately by deleting it server-side [[session.revocable]] \u2014 which is the whole reason the token is opaque rather than a JWT.\n\nThere are no refresh tokens [[auth.no-refresh]]. A user whose session expires signs in again [[auth.reauth-on-expiry]].",
+      "claims": [
+        "session.issued-by-bff",
+        "session.ttl",
+        "session.revocable",
+        "auth.no-refresh",
+        "auth.reauth-on-expiry"
+      ]
+    },
+    {
+      "id": "downstream",
+      "title": "What the services behind it assume",
+      "narrative": "The BFF forwards the verified user id inward on the `x-user-id` header [[session.forwarded-identity]]. Every domain API authorises on that header alone and performs no verification of its own [[api.trusts-header]].\n\n> This is the load-bearing assumption of the whole design: **the header is trusted because the network is**. A domain API reachable by any route other than the BFF has no authentication at all. If that ever stops being true \u2014 a new ingress, a debugging port, a service mesh change \u2014 this document is wrong and the system is open.",
+      "claims": [
+        "session.forwarded-identity",
+        "api.trusts-header"
+      ]
+    },
+    {
+      "id": "exceptions",
+      "title": "The two things that bypass it",
+      "narrative": "Two paths do not carry a session.\n\nStripe calls the webhook endpoint directly and authenticates by signature instead [[webhook.signature]]. That endpoint is the one place a request from outside reaches a domain concern without passing a session check, and the signature is the only thing standing in its place.\n\nThe second is internal traffic between domain APIs, which is covered below rather than here: nothing currently documents how, or whether, those calls are authenticated.",
+      "claims": [
+        "webhook.signature"
+      ]
+    },
+    {
+      "id": "coverage",
+      "title": "What this document does not cover",
+      "narrative": "Read this before trusting an absence. Something missing here is either out of scope below, listed as noticed-and-unaccounted-for, or nobody has looked.",
+      "generate": [
+        "coverage"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "session.issued-by-bff",
+      "text": "The BFF issues an opaque session token and stores the user id against it server-side.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth",
+        "session"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/session.service.ts",
+        "symbol": "SessionService",
+        "line": 10,
+        "end_line": 14,
+        "hash": "973d9cd1899f"
+      }
+    },
+    {
+      "id": "session.ttl",
+      "text": "A session is valid for twelve hours from the moment it is issued.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth",
+        "session"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/session.service.ts",
+        "symbol": "TTL_MS",
+        "line": 4,
+        "end_line": 4,
+        "hash": "c318ebc926bf"
+      }
+    },
+    {
+      "id": "session.revocable",
+      "text": "A session can be ended immediately by deleting its token server-side.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth",
+        "session"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/session.service.ts",
+        "symbol": "revoke",
+        "line": 26,
+        "end_line": 28,
+        "hash": "64faceb52a89"
+      }
+    },
+    {
+      "id": "auth.no-refresh",
+      "text": "The system issues no refresh tokens.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19",
+        "rationale": "A twelve-hour session covers a working day, and revocation matters more here than uninterrupted sessions."
+      }
+    },
+    {
+      "id": "auth.reauth-on-expiry",
+      "text": "A user whose session expires signs in again.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19"
+      }
+    },
+    {
+      "id": "session.forwarded-identity",
+      "text": "The BFF forwards the verified user id to the domain APIs in the x-user-id header.",
+      "subject": "shop.c4#bff",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "bff/src/auth/identity.interceptor.ts",
+        "symbol": "IdentityInterceptor",
+        "hash": "e12859b083fa"
+      }
+    },
+    {
+      "id": "api.trusts-header",
+      "text": "The Order API authorises requests on the forwarded x-user-id header alone and verifies nothing itself.",
+      "subject": "shop.c4#order_api",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "order-api/src/auth/identity.guard.ts",
+        "symbol": "IdentityGuard",
+        "hash": "750754a1ffff"
+      }
+    },
+    {
+      "id": "webhook.signature",
+      "text": "The Stripe webhook endpoint authenticates its caller by verifying a Stripe signature instead of a session.",
+      "subject": "shop.endpoints#stripe-webhook",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "order-api/src/payments/stripe-webhook.controller.ts",
+        "symbol": "StripeWebhookController",
+        "hash": "0f9d5e1b22aa"
+      }
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Opaque token",
+      "definition": "A session identifier that carries no information of its own: the server holds everything it means, so revoking it is a delete rather than a wait.",
+      "see": "shop.c4#bff"
+    }
+  ],
+  "coverage": {
+    "out_of_scope": [
+      {
+        "area": "How a user proves who they are in the first place",
+        "reason": "Sign-in, password handling and any identity provider are not documented here. This document starts at the point a session exists."
+      },
+      {
+        "area": "Authorisation",
+        "reason": "This covers who the caller is, not what they are allowed to do. Role and permission checks are not documented anywhere yet."
+      },
+      {
+        "area": "Service-to-service calls inside the private network",
+        "reason": "Not documented yet. Whether the domain APIs authenticate each other is unknown, and the trust-the-header design means it matters."
+      },
+      {
+        "area": "Admin console access",
+        "reason": "Ops staff reach the Admin console, which uses the same BFF sessions, but no claim here covers how ops accounts differ from customer accounts."
+      }
+    ]
+  }
+}

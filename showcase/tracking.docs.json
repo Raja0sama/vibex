@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "diagram_type": "docs",
+  "meta": {
+    "id": "tracking.docs",
+    "title": "How tracking works",
+    "subtitle": "What a tracking number is, why the page needs no login, and what a scan does and does not prove",
+    "repository": {
+      "url": "https://github.com/example/relay",
+      "revision": "main"
+    }
+  },
+  "covers": [
+    "relay.erd",
+    "relay.endpoints",
+    "parcel.lifecycle"
+  ],
+  "review_window_days": 90,
+  "sections": [
+    {
+      "id": "number",
+      "title": "The tracking number is the credential",
+      "narrative": "A recipient has no account and will never make one. They arrive from an SMS, look at one parcel, and leave. So the tracking number itself is what grants access [[track.number-is-credential]], and everything about the endpoint follows from accepting that.\n\nIt is sixteen characters [[track.sixteen-chars]] and the endpoint answers *not found* identically for a malformed number, an unknown number, and a number that does not exist [[track.uniform-404]] — telling them apart would make the number space enumerable one request at a time. Requests are rate limited per caller on top of that [[track.rate-limited]].\n\nThe response carries nothing that is not already printed on the label [[track.label-only]]. Someone holding the number can already read all of it off the parcel in their hand.",
+      "claims": [
+        "track.number-is-credential",
+        "track.sixteen-chars",
+        "track.uniform-404",
+        "track.rate-limited",
+        "track.label-only"
+      ]
+    },
+    {
+      "id": "guarantees",
+      "title": "What a scan proves, and what it doesn't",
+      "narrative": "A scan is evidence that a barcode was read by a device at a moment. That is all it is, and three things follow that surprise people reading this data for the first time.\n\n**The time can be wrong.** `scanned_at` is the handheld's clock [[scans.device-clock]]. A device that has been offline in a depot basement for six hours may also have drifted.\n\n**The order is not arrival order.** Batches upload late, so a scan can land after ones that happened later [[scans.late-arrival]]. A tracking history is ordered by when things happened, not by when Relay heard about them.\n\n**A quiet parcel is not a stopped parcel.** Ten days without a scan marks it lost [[parcel.lost-after-ten-days]], but the gap before that is ordinary — a parcel on a trunk vehicle overnight is scanned at neither end until it arrives.",
+      "claims": [
+        "scans.device-clock",
+        "scans.late-arrival",
+        "parcel.lost-after-ten-days"
+      ]
+    },
+    {
+      "id": "changing",
+      "title": "What a recipient can change",
+      "narrative": "Rescheduling and redirecting both need a one-time code [[change.needs-otp]], because both change where a parcel physically goes and the tracking number alone is a number printed on a box that everyone who handled it has seen.\n\nNeither is accepted once the parcel is out for delivery that day [[change.not-when-loaded]] — the van is already loaded and sequenced, and the driver is still holding the stop.",
+      "generate": [
+        "endpoints.operations"
+      ],
+      "claims": [
+        "change.needs-otp",
+        "change.not-when-loaded"
+      ]
+    },
+    {
+      "id": "coverage",
+      "title": "What this document does not cover",
+      "narrative": "Read this before trusting an absence. Something missing here is either out of scope below, listed as noticed-and-unaccounted-for, or nobody has looked.",
+      "generate": [
+        "coverage"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "track.number-is-credential",
+      "text": "Knowing a tracking number is the only thing required to read that parcel's history.",
+      "subject": "relay.endpoints#track",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/tracking.handler.go",
+        "symbol": "Track",
+        "hash": "32cb3e295ca4"
+      }
+    },
+    {
+      "id": "track.sixteen-chars",
+      "text": "A tracking number is exactly sixteen characters long.",
+      "subject": "relay.erd#parcel",
+      "tags": [
+        "format"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/tracking.handler.go",
+        "symbol": "trackingNumberLen",
+        "hash": "32cb3e295ca4"
+      }
+    },
+    {
+      "id": "track.uniform-404",
+      "text": "A malformed tracking number and an unknown one produce the same response.",
+      "subject": "relay.endpoints#track",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/tracking.handler.go",
+        "symbol": "EventsFor",
+        "hash": "32cb3e295ca4"
+      }
+    },
+    {
+      "id": "track.rate-limited",
+      "text": "Tracking requests are limited to twenty per minute per caller.",
+      "subject": "relay.endpoints#track",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/tracking.handler.go",
+        "symbol": "rateLimitPerMinute",
+        "hash": "32cb3e295ca4"
+      }
+    },
+    {
+      "id": "track.label-only",
+      "text": "The public tracking response contains nothing that is not already printed on the parcel's label.",
+      "subject": "relay.endpoints#track",
+      "tags": [
+        "privacy"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/tracking.handler.go",
+        "symbol": "redactForPublic",
+        "hash": "32cb3e295ca4"
+      }
+    },
+    {
+      "id": "scans.device-clock",
+      "text": "scanned_at comes from the handheld's own clock and can be wrong.",
+      "subject": "relay.erd#scan",
+      "tags": [
+        "data"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/scans/ingest.go",
+        "symbol": "ScannedAt",
+        "hash": "cc78e31929e2"
+      }
+    },
+    {
+      "id": "scans.late-arrival",
+      "text": "A scan batch can arrive after scans that happened later, because handhelds upload only when they find signal.",
+      "subject": "relay.erd#scan",
+      "tags": [
+        "ordering"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/scans/ingest.go",
+        "symbol": "Batch",
+        "hash": "cc78e31929e2"
+      }
+    },
+    {
+      "id": "parcel.lost-after-ten-days",
+      "text": "A parcel with no scan for ten days is marked lost and a claim is opened automatically.",
+      "subject": "parcel.lifecycle#lost",
+      "tags": [
+        "policy"
+      ],
+      "source": {
+        "kind": "asserted",
+        "by": "ana@example.com",
+        "at": "2026-09-19",
+        "rationale": "Ten days is the longest a legitimate parcel has ever gone quiet in this network, measured over two years."
+      }
+    },
+    {
+      "id": "change.needs-otp",
+      "text": "Rescheduling and redirecting both require a one-time code sent to the phone on the shipment.",
+      "subject": "relay.endpoints#reschedule",
+      "tags": [
+        "auth"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/reschedule.handler.go",
+        "symbol": "otp.Verify",
+        "hash": "f79ae0391609"
+      }
+    },
+    {
+      "id": "change.not-when-loaded",
+      "text": "Neither is accepted once the parcel is out for delivery that day.",
+      "subject": "relay.endpoints#reschedule",
+      "tags": [
+        "policy"
+      ],
+      "source": {
+        "kind": "anchored",
+        "path": "src/tracking/reschedule.handler.go",
+        "symbol": "StatusOutForDelivery",
+        "hash": "f79ae0391609"
+      }
+    }
+  ],
+  "glossary": [
+    {
+      "term": "One-time code",
+      "definition": "A short code texted to the phone number on the shipment, good for one change and a few minutes.",
+      "see": "relay.endpoints#reschedule"
+    }
+  ],
+  "coverage": {
+    "out_of_scope": [
+      {
+        "area": "What the merchant sees",
+        "reason": "Merchants read tracking through the authenticated shipment API, which has a different response shape and different redaction rules. That is covered in the Relay system document."
+      },
+      {
+        "area": "How the one-time code is generated and checked",
+        "reason": "Not documented yet. This document says reschedule and redirect require one; nothing here says how long it lives or how many attempts are allowed."
+      },
+      {
+        "area": "Notification content and timing",
+        "reason": "Which SMS a recipient gets, and when, is owned by the notifier and is not modelled here."
+      },
+      {
+        "area": "Tracking for partner-carrier parcels",
+        "reason": "Not documented yet. Once a parcel leaves for a partner carrier the scan history goes quiet, and nothing here explains what a recipient sees."
+      }
+    ]
+  }
+}

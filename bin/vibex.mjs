@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateSpec, formatReport, DIAGRAM_TYPES } from '../renderers/shared/validate.mjs';
 import { renderSpec } from '../renderers/shared/render.mjs';
+import { buildGraph, specId } from '../renderers/docs/graph.mjs';
+import { checkAnchor } from '../renderers/docs/anchors.mjs';
+import { toMarkdown } from '../renderers/docs/to-markdown.mjs';
+import { head, dirtyPaths, changedSince, shortSha, prefix as gitPrefix, underPrefix } from '../renderers/docs/git.mjs';
+import { planCheck, mergeLock, verifiedCommits, emptyLock } from '../renderers/docs/incremental.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const HELP = `vibeX — JSON spec → standalone HTML diagram (ERD, C4, API endpoints)
+const HELP = `vibeX — you vibed it into existence; this shows you what you built
+        JSON spec → standalone HTML diagram (ERD, C4, API endpoints, lifecycle)
 
 Usage:
   vibex validate <spec.json> [--json]
@@ -16,13 +22,22 @@ Usage:
   vibex import openapi <openapi.json|yaml> [out.json] [--title "..."] [--all-types]
   vibex import graphql <schema.graphql>    [out.json] [--title "..."] [--erd]
   vibex import prisma  <schema.prisma>     [out.json] [--title "..."]
-  vibex dashboard <out.html> <spec.json|dir>... [--title "..."] [--subtitle "..."] [--open] [--json]
-                                  one HTML with every diagram, sidebar, overview, cross-links
+  vibex dashboard <out.html> <spec.json|dir>... [--title "..."] [--subtitle "..."] [--repo <dir>] [--open] [--json]
+                                  one HTML with every diagram, sidebar, overview, cross-links.
+                                  A *.docs.json in the set becomes a Documentation panel;
+                                  --repo lets its anchored claims be checked.
+  vibex docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo <dir>]
+                 [--check] [--reanchor] [--lock docs.lock.json] [--no-lock] [--json]
+                                  build the fact graph: derived facts + authored claims,
+                                  each with provenance and a computed confidence.
+                                  Uses git to re-read only the anchors whose files moved
+                                  since the commit recorded in the lock file.
   vibex demo [out-dir]          render the bundled examples (+ dashboard.html)
   vibex types                   list diagram types and schema paths
   vibex help                    this text
 
 Exit codes: 0 ok, 1 validation errors, 2 usage / IO error.
+  docs --check also exits 1 when any claim is stale, broken, or expired.
 Renderer warnings never fail a render; they print to stderr (or "warnings" in --json).`;
 
 // --flag with no value: never swallows the next positional.
@@ -73,6 +88,152 @@ function openFile(file) {
   const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
   const args = process.platform === 'win32' ? ['/c', 'start', '', file] : [file];
   spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+}
+
+// Collect diagram specs from files and directories, keyed by their spec id
+// (meta.id, else the filename) so docs claims can address them.
+function loadSpecs(paths) {
+  const specs = new Map();
+  for (const p of paths) {
+    const stat = fs.statSync(p, { throwIfNoEntry: false });
+    if (!stat) fail(`No such file or directory: ${p}`);
+    const files = stat.isDirectory()
+      ? fs.readdirSync(p).filter((f) => f.endsWith('.json')).map((f) => path.join(p, f))
+      : [p];
+    for (const file of files) {
+      const spec = readJson(file);
+      if (!DIAGRAM_TYPES.includes(spec.diagram_type)) continue;
+      specs.set(specId(spec, path.basename(file).replace(/\.json$/i, '')), spec);
+    }
+  }
+  return specs;
+}
+
+// Reads the working tree for anchored claims. Confined to the repo root: an
+// anchor path that escapes it reads as missing rather than as a file.
+function anchorStatusFor(docsSpec, repoRoot, only = null) {
+  const repo = path.resolve(repoRoot);
+  const readFile = (rel) => {
+    const abs = path.resolve(repo, rel);
+    if (!abs.startsWith(repo + path.sep)) return null;
+    try { return fs.readFileSync(abs, 'utf8'); } catch { return null; }
+  };
+  const status = new Map();
+  for (const c of docsSpec.claims || []) {
+    if (c.source?.kind !== 'anchored') continue;
+    if (only && !only.has(c.id)) continue;
+    status.set(c.id, checkAnchor(c.source, readFile));
+  }
+  return status;
+}
+
+// git, run inside the repo. Any failure returns null, which every caller reads
+// as "unknown" and resolves by checking more, never less.
+function gitRunner(repoRoot) {
+  return (args) => {
+    try {
+      return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch { return null; }
+  };
+}
+
+// Re-check only what git says moved; carry the rest forward from the lock.
+function checkAnchorsIncremental(docsSpec, repoRoot, lockPath) {
+  const run = gitRunner(repoRoot);
+  const commit = head(run);
+  const lock = lockPath && fs.existsSync(lockPath)
+    ? (() => { try { return JSON.parse(fs.readFileSync(lockPath, 'utf8')); } catch { return null; } })()
+    : null;
+
+  const pre = gitPrefix(run);
+  const dirty = underPrefix(dirtyPaths(run), pre);
+  const changed = underPrefix(lock?.commit ? changedSince(run, lock.commit) : null, pre);
+  const plan = planCheck({ claims: docsSpec.claims, lock, commit, changed, dirty });
+
+  const fresh = anchorStatusFor(docsSpec, repoRoot, plan.recheck);
+  const status = new Map(fresh);
+  for (const [id, prev] of plan.reuse) status.set(id, { ...prev, reused: true });
+
+  return { status, commit, lock, plan, nextLock: mergeLock({ claims: docsSpec.claims, lock, statuses: status, commit }) };
+}
+
+function cmdDocs(args) {
+  const asJson = boolFlag(args, '--json');
+  const check = boolFlag(args, '--check');
+  const reanchor = boolFlag(args, '--reanchor');
+  const outArg = valueFlag(args, '-o') || valueFlag(args, '--out');
+  const mdArg = valueFlag(args, '--md');
+  const lockArg = valueFlag(args, '--lock');
+  const noLock = boolFlag(args, '--no-lock');
+  const repo = path.resolve(valueFlag(args, '--repo') || process.cwd());
+  rejectUnknownFlags(args);
+  const [docsFile, ...specPaths] = args;
+  if (!docsFile) fail(HELP);
+
+  const docsSpec = readJson(docsFile);
+  const report = validateSpec(docsSpec);
+  if (!report.ok) {
+    if (asJson) console.log(JSON.stringify({ ok: false, errors: report.errors, warnings: report.warnings }, null, 2));
+    else console.error(formatReport(report));
+    process.exit(1);
+  }
+
+  const specs = loadSpecs(specPaths.length ? specPaths : [path.dirname(docsFile)]);
+
+  // Anchor checking is the whole point of an anchored claim, so read the tree
+  // here rather than trusting what the file says about itself — but only the
+  // files git says have moved since the last run.
+  const lockPath = path.resolve(lockArg || path.join(path.dirname(docsFile), 'docs.lock.json'));
+  const { status: anchorStatus, commit, plan, nextLock } = checkAnchorsIncremental(docsSpec, repo, noLock ? null : lockPath);
+
+  if (reanchor) {
+    let updated = 0;
+    for (const c of docsSpec.claims || []) {
+      const st = anchorStatus.get(c.id);
+      if (st?.state !== 'changed') continue;
+      c.source.hash = st.hash;
+      anchorStatus.set(c.id, { state: 'match', detail: '', commit });
+      if (nextLock.claims[c.id]) nextLock.claims[c.id] = { state: 'match', hash: st.hash, commit: commit || null };
+      updated += 1;
+    }
+    writeOut(path.resolve(docsFile), `${JSON.stringify(docsSpec, null, 2)}\n`);
+    console.error(`reanchored ${updated} claim(s) in ${docsFile} — re-read each one before trusting it`);
+  }
+
+  const pkg = readJson(path.join(root, 'package.json'));
+  const graph = buildGraph(docsSpec, {
+    specs,
+    anchorStatus,
+    commit,
+    verifiedCommits: verifiedCommits(nextLock),
+    generator: `vibex ${pkg.version}`,
+  });
+  if (!noLock) writeOut(lockPath, `${JSON.stringify(nextLock, null, 2)}\n`);
+  const out = path.resolve(outArg || path.join(path.dirname(docsFile), 'docs.json'));
+  writeOut(out, `${JSON.stringify(graph, null, 2)}\n`);
+  let mdOut = null;
+  if (mdArg) { mdOut = path.resolve(mdArg); writeOut(mdOut, toMarkdown(graph)); }
+
+  const { counts, unknown } = graph.coverage;
+  // A proposal has nothing to drift from, so --check has nothing to say about it.
+  const unresolved = counts.stale + counts.broken + counts.expired;
+
+  if (asJson) {
+    console.log(JSON.stringify({ ok: !check || unresolved === 0, out, ...(mdOut ? { markdown: mdOut } : {}), coverage: graph.coverage, warnings: report.warnings }, null, 2));
+  } else {
+    console.log(out);
+    if (mdOut) console.log(mdOut);
+    console.error(`${counts.claims} claims — ${counts.verified} verified, ${counts.asserted} asserted`
+      + `${counts.proposed ? `, ${counts.proposed} proposed` : ''}`
+      + `, ${counts.stale} stale, ${counts.broken} broken, ${counts.expired} expired`);
+    if (graph.project?.proposed) console.error('this document is a proposal: nothing in it describes something that exists');
+    console.error(`anchors: ${plan.recheck.size} re-read, ${plan.reuse.size} reused (${plan.reason})${commit ? ` at ${shortSha(commit)}` : ''}`);
+    for (const c of graph.claims) {
+      if (['stale', 'broken', 'expired'].includes(c.confidence)) console.error(`  ${c.confidence.padEnd(8)} ${c.id}: ${c.detail}`);
+    }
+    for (const u of unknown) console.error(`  unknown  ${u.what}: ${u.why}`);
+  }
+  process.exit(check && unresolved ? 1 : 0);
 }
 
 function cmdValidate(args) {
@@ -171,6 +332,7 @@ async function cmdDashboard(args) {
   const subtitle = valueFlag(args, '--subtitle');
   const open = boolFlag(args, '--open');
   const json = boolFlag(args, '--json');
+  const repoArg = valueFlag(args, '--repo');
   rejectUnknownFlags(args);
   const [outArg, ...inputs] = args;
   if (!outArg || !inputs.length) fail(HELP);
@@ -185,7 +347,14 @@ async function cmdDashboard(args) {
   }
   for (const u of unreadable) console.error(`skipped ${u.file}: ${u.message}`);
   if (!items.length) fail('No diagram specs found (need JSON files with a diagram_type).');
-  const { html, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle });
+  const docsCount = items.filter((i) => i.spec.diagram_type === 'docs').length;
+  if (docsCount && !repoArg) console.error('warning no --repo given: anchored claims cannot be checked and will read as unverifiable');
+  // Resolved per document: claim ids are only unique within one docs spec.
+  const anchorStatus = docsCount ? ((spec) => anchorStatusFor(spec, repoArg || process.cwd())) : null;
+  // The commit the reader is looking at, not the branch the spec names. It ends
+  // up in every "report this" link, so an issue points at an exact tree.
+  const commit = docsCount ? head(gitRunner(path.resolve(repoArg || process.cwd()))) : null;
+  const { html, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit });
   for (const p of problems) console.error(`skipped ${p.file}: ${p.errors.map((e) => e.message).join('; ')}`);
   for (const w of warnings) console.error(`warning ${w}`);
   const out = path.resolve(outArg);
@@ -203,17 +372,24 @@ async function cmdDemo(args) {
   try { fs.mkdirSync(outDir, { recursive: true }); } catch (e) { fail(`Cannot create ${outDir}: ${e.message}`); }
   const examplesDir = path.join(root, 'examples');
   const { renderDashboard } = await import('../renderers/shared/dashboard.mjs');
-  const dash = renderDashboard(
-    fs.readdirSync(examplesDir).filter((f) => f.endsWith('.json')).map((name) => ({ file: name.replace(/\.json$/, ''), spec: readJson(path.join(examplesDir, name)) })),
-    { title: 'Shop platform', subtitle: 'Example dashboard: architecture, data model, APIs' },
-  );
+  const examples = fs.readdirSync(examplesDir).filter((f) => f.endsWith('.json'))
+    .map((name) => ({ file: name.replace(/\.json$/, ''), spec: readJson(path.join(examplesDir, name)) }));
+  // The example's claims are anchored to the fixture repo shipped for the tests,
+  // so the demo shows a document whose anchors actually check out.
+  const fixtureRepo = path.join(root, 'examples/shop-repo');
+  const dash = renderDashboard(examples, {
+    title: 'Shop platform',
+    subtitle: 'Example dashboard: architecture, data model, APIs, documentation',
+    anchorStatus: (spec) => anchorStatusFor(spec, fixtureRepo),
+    commit: head(gitRunner(root)),
+  });
   writeOut(path.join(outDir, 'dashboard.html'), dash.html);
   console.log(path.join(outDir, 'dashboard.html'));
-  for (const name of fs.readdirSync(examplesDir).filter((f) => f.endsWith('.json'))) {
-    const spec = readJson(path.join(examplesDir, name));
+  for (const { file: name, spec } of examples) {
+    if (!DIAGRAM_TYPES.includes(spec.diagram_type)) continue; // docs live in the dashboard
     const { report, html, warnings } = renderSpec(spec);
     if (!report.ok) { console.error(`${name}: ${formatReport(report)}`); continue; }
-    const out = path.join(outDir, name.replace(/\.json$/, '.html'));
+    const out = path.join(outDir, `${name}.html`);
     writeOut(out, html);
     for (const w of warnings) console.error(`warning ${name}: ${w}`);
     console.log(out);
@@ -232,6 +408,7 @@ switch (command) {
   case 'render': cmdRender(rest); break;
   case 'import': await cmdImport(rest); break;
   case 'dashboard': await cmdDashboard(rest); break;
+  case 'docs': cmdDocs(rest); break;
   case 'demo': await cmdDemo(rest); break;
   case 'types': cmdTypes(); break;
   case undefined: case 'help': case '-h': case '--help': console.log(HELP); break;

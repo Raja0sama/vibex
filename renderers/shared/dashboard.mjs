@@ -5,6 +5,8 @@ import { esc } from './utils.mjs';
 import { validateSpec } from './validate.mjs';
 import { RENDERERS, embeddable } from './render.mjs';
 import { renderCards, renderLegend, assetSlots, fillSlots, embedJson, TOOLBAR_ACTIONS } from './template.mjs';
+import { buildGraph, specId } from '../docs/graph.mjs';
+import { renderDocsPanel, docsNavHtml } from '../docs/render-docs.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DASHBOARD_TEMPLATE_PATH = path.resolve(here, '../../assets/dashboard.html');
@@ -131,12 +133,15 @@ export function loadDashboardTemplate(templatePath = DASHBOARD_TEMPLATE_PATH) {
 }
 
 // specs: array of { spec, file } where file is the spec's basename without extension.
-export function renderDashboard(items, { title = 'Architecture', subtitle, theme } = {}) {
+export function renderDashboard(items, { title = 'Architecture', subtitle, theme, anchorStatus = null, commit = null, now } = {}) {
   const entries = [];
   const problems = [];
+  const docsSpecs = [];
   items.forEach(({ spec, file }) => {
     const report = validateSpec(spec);
     if (!report.ok) { problems.push({ file, errors: report.errors }); return; }
+    // A docs spec has no renderer and must not take a panel index.
+    if (spec.diagram_type === 'docs') { docsSpecs.push({ spec, file }); return; }
     entries.push({ spec, file, index: entries.length });
   });
   entries.sort((a, b) => TYPE_ORDER.indexOf(a.spec.diagram_type) - TYPE_ORDER.indexOf(b.spec.diagram_type));
@@ -157,6 +162,43 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     }
     nav += '</div>';
   }
+  // Documentation panels, one per docs spec, first in the nav: the prose is the
+  // way in and the diagrams are the detail. Several docs specs is the normal
+  // case — one per topic ("how authentication works") reads far better than one
+  // document trying to be the whole system.
+  const docsGraphs = [];
+  if (docsSpecs.length) {
+    const byId = new Map(entries.map((e) => [specId(e.spec, e.file), e.spec]));
+    const panelOf = new Map(entries.map((e) => [specId(e.spec, e.file), e.index]));
+    const labelOf = new Map(entries.map((e) => [specId(e.spec, e.file), e.spec.meta.title || e.file]));
+
+    docsSpecs.sort((a, b) => String(a.spec.meta?.title || a.file).localeCompare(String(b.spec.meta?.title || b.file)));
+
+    let docsNav = '';
+    let docsPanels = '';
+    docsSpecs.forEach(({ spec, file }, i) => {
+      const graph = buildGraph(spec, {
+        specs: byId,
+        anchorStatus: typeof anchorStatus === 'function' ? anchorStatus(spec, file) : (docsSpecs.length === 1 ? anchorStatus : null),
+        ...(commit ? { commit } : {}),
+        ...(now ? { now } : {}),
+      });
+      const subjectLabel = new Map(graph.subjects.map((sub) => [sub.ref, sub.label]));
+      const resolveSubject = (ref) => {
+        const [sid, node] = String(ref).split('#');
+        if (!panelOf.has(sid)) return null;
+        return { panel: panelOf.get(sid), node: node || null, label: subjectLabel.get(ref) || labelOf.get(sid) || ref };
+      };
+      const panelId = `docs-${i}`;
+      docsNav += docsNavHtml(graph, panelId);
+      docsPanels += renderDocsPanel(graph, { resolveSubject, panelId });
+      graph.__panel = panelId;
+      docsGraphs.push(graph);
+    });
+    nav = `<div class="group"><h2>Documentation</h2>${docsNav}</div>` + nav;
+    panels = docsPanels + panels;
+  }
+
   const html = fillSlots(loadDashboardTemplate(), {
     ...assetSlots(),
     TITLE: esc(title),
@@ -167,5 +209,5 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     OVERVIEW: `<div class="overview">${overviewHtml(title, subtitle, entries)}</div>`,
     SPECS: embedJson(entries.map((e) => ({ ...(e.embed || e.spec), __file: e.file }))),
   });
-  return { html, entries, problems, warnings };
+  return { html, entries, problems, warnings, docsGraphs, docsGraph: docsGraphs[0] || null };
 }

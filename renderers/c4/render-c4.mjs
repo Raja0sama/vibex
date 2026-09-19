@@ -1,17 +1,47 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, wrapText, fitChars, num, cellIndex } from '../shared/utils.mjs';
-import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets } from '../shared/layout.mjs';
+import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const MARGIN = 40;
 const BOUNDARY_PAD = 28;
-const BOUNDARY_LABEL_H = 24;
-const SIZES = { person: { w: 200, h: 146 }, default: { w: 250, h: 136 } };
-const TITLE_PX = 16; const SUB_PX = 12; const DESC_PX = 12.5; const DESC_LH = 16;
+const BOUNDARY_LABEL_H = 26;
+const WIDTH = { person: 208, default: 248 };
+const TITLE_PX = 15; const SUB_PX = 10.5; const DESC_PX = 11.5; const DESC_LH = 15;
+// Vertical room the shape itself eats before any text can start.
+const SHAPE_TOP = { person: 44, database: 30, default: 16 };
+const PAD_BOTTOM = 16;
+const DRILL_H = 20;
 
-function sizeOf(el) {
-  const base = el.kind === 'person' ? SIZES.person : SIZES.default;
-  const descLines = wrapText(el.description || '', fitChars(base.w - 24, DESC_PX), 3).length;
-  return { w: base.w, h: base.h + Math.max(0, descLines - 2) * DESC_LH };
+function descLines(el, w) {
+  return wrapText(el.description || '', fitChars(w - 28, DESC_PX), 3);
+}
+
+// Text block: title baseline, stereotype 16px under it, description 19px under
+// that. Returns the height the block needs so boxes can hug their content.
+function blockHeight(el, w) {
+  const lines = descLines(el, w).length;
+  return 15 + 16 + (lines ? 19 + (lines - 1) * DESC_LH + 4 : 0);
+}
+
+// One height for every non-person element keeps a rank looking like a row of
+// cards instead of a ragged skyline.
+function makeSizeOf(elements) {
+  let shared = 0;
+  for (const el of elements) {
+    if (el.kind === 'person') continue;
+    const w = WIDTH.default;
+    const top = SHAPE_TOP[el.kind] ?? SHAPE_TOP.default;
+    shared = Math.max(shared, top + blockHeight(el, w) + (el.link ? DRILL_H : 0) + PAD_BOTTOM);
+  }
+  shared = Math.max(shared, 104);
+  return (el) => {
+    if (el.kind === 'person') {
+      const w = WIDTH.person;
+      const h = SHAPE_TOP.person + blockHeight(el, w) + (el.link ? DRILL_H : 0) + PAD_BOTTOM;
+      return { w, h: Math.max(h, 128) };
+    }
+    return { w: WIDTH.default, h: shared };
+  };
 }
 
 // Rank elements by relationship flow so the diagram reads top-to-bottom:
@@ -75,34 +105,73 @@ function renderElement(el, rect) {
   let out = `<g${nodeAttrs(el.id, el.label, { class: cls, kind })}>`;
   const tip = [el.label, el.technology ? `[${el.technology}]` : '', el.description || ''].filter(Boolean).join(' — ');
   out += `<title>${esc(tip)}</title>`;
-  let textTop = y;
-  if (kind === 'person') {
-    const headR = 18;
-    out += `<circle cx="${x + w / 2}" cy="${y + headR + 2}" r="${headR}"/>`;
-    out += `<rect class="box" x="${x}" y="${y + headR * 2 - 6}" width="${w}" height="${h - headR * 2 + 6}" rx="14"/>`;
-    textTop = y + headR * 2 + 6;
-  } else if (kind === 'database') {
-    out += `<rect class="box" x="${x}" y="${y + 10}" width="${w}" height="${h - 10}" rx="10"/>`;
-    out += `<ellipse cx="${x + w / 2}" cy="${y + 12}" rx="${w / 2}" ry="12"/>`;
-    out += `<path class="db-line" d="M${x} ${y + 12} a${w / 2} 12 0 0 0 ${w} 0"/>`;
-    textTop = y + 20;
-  } else if (kind === 'queue') {
-    out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}"/>`;
-    textTop = y + 8;
-  } else {
-    out += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${kind === 'component' ? 6 : 10}"/>`;
-    textTop = y + 8;
-  }
   const cx = x + w / 2;
-  const titleMax = fitChars(w - 24, TITLE_PX);
-  out += svgText(cx, textTop + 22, truncate(el.label, titleMax), { cls: 'title', anchor: 'middle' });
-  const stereo = `[${el.kind === 'person' ? 'Person' : el.kind[0].toUpperCase() + el.kind.slice(1)}${el.technology ? `: ${el.technology}` : ''}${el.external ? ', external' : ''}]`;
-  out += svgText(cx, textTop + 39, truncate(stereo, fitChars(w - 20, SUB_PX)), { cls: 'sub', anchor: 'middle' });
-  const lines = wrapText(el.description || '', fitChars(w - 24, DESC_PX), 3);
-  lines.forEach((line, i) => { out += svgText(cx, textTop + 62 + i * DESC_LH, line, { cls: 'desc', anchor: 'middle' }); });
-  if (el.link) out += svgText(x + w - 10, y + h - 8, '↗ drill down', { cls: 'sub', anchor: 'end' });
+  let textTop = y + SHAPE_TOP.default;
+  // Shapes go in their own group so one drop shadow covers the whole
+  // silhouette (head plus body, cylinder plus caps) and never touches text.
+  let shape = '';
+  if (kind === 'person') {
+    // Head clear of the shoulders so the silhouette reads as a person rather
+    // than a notched rectangle.
+    const headR = 17;
+    const bodyY = y + headR * 2;
+    shape += `<circle cx="${cx}" cy="${y + headR + 1}" r="${headR}"/>`;
+    shape += `<rect class="box" x="${x}" y="${bodyY}" width="${w}" height="${h - (bodyY - y)}" rx="16"/>`;
+    textTop = y + SHAPE_TOP.person;
+  } else if (kind === 'database') {
+    const ry = 11;
+    shape += `<rect class="box" x="${x}" y="${y + ry}" width="${w}" height="${h - ry * 2}" rx="0"/>`;
+    shape += `<ellipse cx="${cx}" cy="${y + h - ry}" rx="${w / 2}" ry="${ry}"/>`;
+    shape += `<ellipse cx="${cx}" cy="${y + ry}" rx="${w / 2}" ry="${ry}"/>`;
+    shape += `<path class="db-line" d="M${x} ${y + ry} a${w / 2} ${ry} 0 0 0 ${w} 0"/>`;
+    textTop = y + SHAPE_TOP.database;
+  } else if (kind === 'queue') {
+    const r = Math.min(h / 2, 26);
+    shape += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>`;
+  } else {
+    shape += `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="${kind === 'component' ? 6 : 12}"/>`;
+  }
+
+  out += `<g filter="url(#m-shadow)">${shape}</g>`;
+
+  // Centre the text block in the room left between the shape top and the
+  // bottom padding, so a one-line description does not leave a void.
+  const lines = descLines(el, w);
+  const drill = el.link ? DRILL_H : 0;
+  const avail = (y + h - PAD_BOTTOM - drill) - textTop;
+  const top = textTop + Math.max(0, (avail - blockHeight(el, w)) / 2);
+
+  out += svgText(cx, top + 15, truncate(el.label, fitChars(w - 24, TITLE_PX)), { cls: 'title', anchor: 'middle' });
+  const stereo = `[${kind === 'person' ? 'Person' : kind[0].toUpperCase() + kind.slice(1)}${el.technology ? `: ${el.technology}` : ''}${el.external ? ', external' : ''}]`;
+  out += svgText(cx, top + 31, truncate(stereo, fitChars(w - 20, SUB_PX)), { cls: 'sub', anchor: 'middle' });
+  lines.forEach((line, i) => { out += svgText(cx, top + 50 + i * DESC_LH, line, { cls: 'desc', anchor: 'middle' }); });
+
+  if (el.link) {
+    const text = 'Drill down ↗';
+    const tw = textWidth(text, 10.5);
+    const by = y + h - 11;
+    out += `<path class="drill-rule" d="M${cx - tw / 2} ${by + 3.5} H${cx + tw / 2}"/>`;
+    out += svgText(cx, by, text, { cls: 'drill', anchor: 'middle' });
+  }
   out += '</g>';
   return out;
+}
+
+// Closest point on the routed polyline to (px,py) — used to draw a leader when
+// obstacle avoidance pushes a label away from its own line.
+function nearestOnPath(points, px, py) {
+  if (!points || !points.length) return { x: px, y: py, d: 0 };
+  let best = { x: points[0][0], y: points[0][1], d: Math.hypot(px - points[0][0], py - points[0][1]) };
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const [ax, ay] = points[i]; const [bx, by] = points[i + 1];
+    const dx = bx - ax; const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+    const x = ax + t * dx; const y = ay + t * dy;
+    const d = Math.hypot(px - x, py - y);
+    if (d < best.d) best = { x, y, d };
+  }
+  return best;
 }
 
 function renderRelationship(rel, index, rects, offset, obstacles) {
@@ -121,13 +190,21 @@ function renderRelationship(rel, index, rects, offset, obstacles) {
   if (rel.technology) lines.push({ text: `[${truncate(rel.technology, 30)}]`, tech: true });
   let labelSvg = '';
   if (lines.length) {
-    const widest = Math.max(...lines.map((l) => textWidth(l.text, l.tech ? 11 : 12.5)));
-    const lw = widest + 12; const lh = lines.length * 15 + 6;
+    const widest = Math.max(...lines.map((l) => textWidth(l.text, l.tech ? 10.5 : 11.5)));
+    const lw = widest + 14; const lh = lines.length * 14 + 8;
     const box = placeLabel(route.points, lw, lh, obstacles);
     obstacles.push({ ...box, label: true });
     labelSvg = `<g${base.replace('class="edge"', 'class="edge-label"').replace(/ id="[^"]*"/, '').replace(' tabindex="0" role="button"', '')}><title>${esc(tip)}</title>`;
+    const mid = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const near = nearestOnPath(route.points, mid.x, mid.y);
+    // Anchor the leader on the box edge nearest the line, not its centre.
+    if (near.d > Math.max(box.w, box.h) / 2 + 10) {
+      const ax = Math.max(box.x, Math.min(near.x, box.x + box.w));
+      const ay = Math.max(box.y, Math.min(near.y, box.y + box.h));
+      labelSvg += `<path class="leader" d="M${ax.toFixed(1)} ${ay.toFixed(1)} L${near.x.toFixed(1)} ${near.y.toFixed(1)}"/>`;
+    }
     labelSvg += `<rect class="label-bg" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"/>`;
-    lines.forEach((l, i) => { labelSvg += svgText(box.x + box.w / 2, box.y + 15 * (i + 1) - 2, l.text, { cls: `label${l.tech ? ' tech' : ''}`, anchor: 'middle' }); });
+    lines.forEach((l, i) => { labelSvg += svgText(box.x + box.w / 2, box.y + 14 * (i + 1), l.text, { cls: `label${l.tech ? ' tech' : ''}`, anchor: 'middle' }); });
     labelSvg += '</g>';
   }
   return { edge, labelSvg };
@@ -146,7 +223,7 @@ export function renderC4(spec) {
     gapY: num(layout.gapY, direction === 'lr' ? 50 : 80) + (hasBoundaries ? BOUNDARY_PAD + BOUNDARY_LABEL_H : 0),
     originX: MARGIN + (hasBoundaries ? BOUNDARY_PAD * 2 : 0),
     originY: MARGIN + (hasBoundaries ? (BOUNDARY_PAD + BOUNDARY_LABEL_H) * 2 : 0),
-    sizeOf,
+    sizeOf: makeSizeOf(spec.elements),
     align: hasBoundaries ? 'left' : 'center',
   });
   const rects = placement.placed;
@@ -166,7 +243,8 @@ export function renderC4(spec) {
     const members = b.contains.map((id) => (byId.has(id) ? resolve(byId.get(id)) : rects.get(id))).filter(Boolean);
     const pad = BOUNDARY_PAD - 8 + depthOf(b) * 6;
     const box = bbox(members, pad);
-    if (box) { box.y -= BOUNDARY_LABEL_H - 8; box.h += BOUNDARY_LABEL_H - 8; }
+    // The label tag straddles the top edge, so only a little extra headroom.
+    if (box) { box.y -= 8; box.h += 8; }
     boundaryRects.set(b.id, box);
     return box;
   };
@@ -175,6 +253,7 @@ export function renderC4(spec) {
   for (const b of boundaries) for (const id of b.contains) insideSome.add(id);
 
   let body = '';
+  const maxDepth = boundaries.length ? Math.max(...boundaries.map((b) => depthOf(b))) : 0;
   const sorted = [...boundaries].sort((a, b) => depthOf(b) - depthOf(a));
   for (const b of sorted) {
     const box = boundaryRects.get(b.id);
@@ -189,14 +268,26 @@ export function renderC4(spec) {
         warnings.push(`boundary "${b.id}" frame overlaps outside element "${e.id}"; set row/col so boundary members sit together`);
       }
     }
-    body += `<g class="boundary" data-boundary-id="${esc(b.id)}" data-node-id="${esc(b.id)}" data-node-label="${esc(b.label)}" data-node-kind="boundary"><rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"/>`;
-    body += svgText(box.x + 12, box.y + 18, b.label, {});
-    body += svgText(box.x + 12 + textWidth(b.label, 13) * 1.12 + 8, box.y + 18, `[${b.kind || 'system'} boundary]`, { cls: 'kind' });
+    // Deeper boundaries get a more solid frame so nesting is readable at a glance.
+    const depth = maxDepth - depthOf(b);
+    const kindText = `${b.kind || 'system'} boundary`.toUpperCase();
+    const labelW = textWidth(b.label, 12) * 1.12;
+    // Uppercase runs wider than textWidth's mixed-case average, and the CSS
+    // adds .04em of tracking; measure both or the frame cuts through the tag.
+    const kindW = kindText.length * (10.5 * 0.7 + 0.42);
+    const tagW = labelW + kindW + 26;
+    body += `<g class="boundary depth-${Math.min(depth, 2)}" data-boundary-id="${esc(b.id)}" data-node-id="${esc(b.id)}" data-node-label="${esc(b.label)}" data-node-kind="boundary">`;
+    body += `<rect class="frame" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"/>`;
+    body += `<rect class="tag" x="${box.x + 10}" y="${box.y - 11}" width="${tagW}" height="22"/>`;
+    body += svgText(box.x + 20, box.y + 4, b.label, {});
+    body += svgText(box.x + 20 + labelW + 8, box.y + 4, kindText, { cls: 'kind' });
     body += '</g>';
   }
 
   const rels = spec.relationships || [];
   const offsets = portOffsets(rels, rects, 22);
+  const channels = channelOffsets(rels, rects, offsets);
+  for (let i = 0; i < rels.length; i += 1) offsets[i].channel = channels[i];
   const obstacles = [...rects.values()].map((r) => ({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 }));
   let labels = '';
   // Place the widest labels first so they get the roomy spots.
@@ -211,16 +302,17 @@ export function renderC4(spec) {
   const width = extent.x + extent.w + MARGIN + 60;
   const height = extent.y + extent.h + MARGIN;
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
-  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'c4' });
+  const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'c4', proposed: spec.meta.proposed === true });
 
   const kinds = new Set(spec.elements.map((e) => (e.external ? 'external' : e.kind)));
+  // Swatch shape mirrors the shape on the canvas, colour mirrors its fill.
   const legendAll = [
-    { key: 'person', label: 'Person', style: 'background:var(--person)' },
+    { key: 'person', label: 'Person', style: 'background:var(--person);border-radius:7px 7px 4px 4px' },
     { key: 'system', label: 'Software system', style: 'background:var(--system)' },
     { key: 'container', label: 'Container', style: 'background:var(--container)' },
     { key: 'component', label: 'Component', style: 'background:var(--component)' },
-    { key: 'database', label: 'Database', style: 'background:var(--container);border-radius:50%' },
-    { key: 'queue', label: 'Queue / topic', style: 'background:var(--container);border-radius:8px' },
+    { key: 'database', label: 'Database', style: 'background:var(--database);border-radius:10px/5px' },
+    { key: 'queue', label: 'Queue / topic', style: 'background:var(--queue);border-radius:999px' },
     { key: 'external', label: 'External (not owned)', style: 'background:var(--external)' },
   ];
   const legend = legendAll.filter((l) => kinds.has(l.key));

@@ -2,6 +2,10 @@ node_modules/
 out/
 *.html
 !assets/*.html
+!site/*.html
 *.tgz
 .DS_Store
 .claude/
+
+# Generated docs artefacts (docs.lock.json IS committed — it is the record)
+docs.json

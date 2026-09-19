@@ -95,7 +95,7 @@ nav .foot button{width:auto;margin:0}
 <body>
 <nav>
   <div class="brand">
-    <span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="4" cy="12" r="2"/><path d="M5.8 4.9 10.2 7.1M10.2 8.9 5.8 11.1"/></svg></span>
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 4H7v8h6M3 12h6V4h4"/><circle cx="3" cy="4" r="1.35" fill="#fff" stroke="none"/><circle cx="13" cy="4" r="1.35" fill="#fff" stroke="none"/><circle cx="3" cy="12" r="1.35" fill="#fff" stroke="none"/><circle cx="13" cy="12" r="1.35" fill="#fff" stroke="none"/></svg></span>
     <span class="txt"><h1><!-- VIBEX:TITLE --></h1><div class="sub"><!-- VIBEX:SUBTITLE --></div></span>
   </div>
   <div class="group"><a href="#" data-panel="overview" class="active" aria-current="page"><span class="dot"></span><span class="t">Overview</span></a></div>
@@ -149,6 +149,7 @@ nav .foot button{width:auto;margin:0}
     return i === -1 ? null : String(i);
   }
   function panelFor(id) { return /^\d+$/.test(String(id)) ? document.querySelector('.panel[data-panel="' + id + '"]') : null; }
+  function panelExists(id) { return !!document.querySelector('.panel[data-panel="' + String(id).replace(/"/g, '') + '"]'); }
   function ensureViewer(i) {
     if (viewers[i]) return viewers[i];
     var panel = panelFor(i);
@@ -165,18 +166,18 @@ nav .foot button{width:auto;margin:0}
     return viewers[i];
   }
   function show(id, nodeId) {
-    if (id !== 'overview' && !panelFor(id)) id = 'overview';
+    if (!panelExists(id)) id = 'overview';
     panels.forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-panel') === String(id)); });
     document.querySelectorAll('nav a[data-panel]').forEach(function (a) {
       var active = a.getAttribute('data-panel') === String(id);
       a.classList.toggle('active', active);
       if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    if (id !== 'overview') {
+    if (panelFor(id)) {
       var v = ensureViewer(id);
       if (nodeId) v.selectNode(nodeId);
       else history.replaceState(null, '', '#d=' + id);
-    } else history.replaceState(null, '', '#');
+    } else history.replaceState(null, '', id === 'overview' ? '#' : '#' + id);
   }
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-panel], [data-goto-panel]');
@@ -186,8 +187,71 @@ nav .foot button{width:auto;margin:0}
   });
   document.querySelector('[data-role=theme-global]').addEventListener('click', function () { VibexTheme.toggle(); });
   function decode(v) { try { return decodeURIComponent(v); } catch (e) { return null; } }
-  var m = /[#&]d=(\d+)/.exec(location.hash), n = /[#&]node=([^&]+)/.exec(location.hash);
-  if (m) show(m[1], n ? decode(n[1]) : null);
+  // One router for the initial hash, for browser back/forward, and for a link
+  // someone pastes into an already-open page.
+  function fromHash() {
+    var hash = location.hash;
+    var d = /[#&]d=(\d+)/.exec(hash);
+    var node = /[#&]node=([^&]+)/.exec(hash);
+    if (d) return { id: d[1], node: node ? decode(node[1]) : null };
+    var docs = /^#(docs)(?:-(\d+))?(?:$|[&/])/.exec(hash);
+    if (docs) return { id: 'docs-' + (docs[2] || '0'), node: null };
+    if (/^#?$/.test(hash)) return { id: 'overview', node: null };
+    return null;
+  }
+  function route() { var t = fromHash(); if (t) show(t.id, t.node); }
+  window.addEventListener('hashchange', route);
+  route();
+
+  // Docs panel: filter claims by text and by whether they need attention.
+  // Plain DOM work — the docs panel has no SVG and needs no viewer.
+  Array.prototype.slice.call(document.querySelectorAll('.panel.docs')).forEach(function docsPanel(panel) {
+    var search = panel.querySelector('[data-role=docs-search]');
+    var buttons = Array.prototype.slice.call(panel.querySelectorAll('[data-docs-filter]'));
+    var claims = Array.prototype.slice.call(panel.querySelectorAll('.claim'));
+    var sections = Array.prototype.slice.call(panel.querySelectorAll('.docs-section'));
+    var noMatch = panel.querySelector('.no-match');
+    var ATTENTION = { stale: 1, broken: 1, expired: 1 };
+    var mode = 'all';
+
+    function apply() {
+      var q = (search && search.value || '').trim().toLowerCase();
+      var shown = 0;
+      claims.forEach(function (el) {
+        var ok = (!q || el.getAttribute('data-find').indexOf(q) !== -1)
+          && (mode === 'all' || ATTENTION[el.getAttribute('data-conf')]);
+        el.hidden = !ok;
+        if (ok) shown += 1;
+      });
+      // A heading with nothing under it is noise; the coverage block stays.
+      sections.forEach(function (sec) {
+        if (sec.querySelector('.coverage') && mode === 'all' && !q) { sec.hidden = false; return; }
+        var any = sec.querySelector('.claim:not([hidden])');
+        sec.hidden = !any;
+      });
+      if (noMatch) noMatch.hidden = shown > 0;
+    }
+    if (search) search.addEventListener('input', apply);
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        mode = b.getAttribute('data-docs-filter');
+        buttons.forEach(function (x) { x.classList.toggle('on', x === b); });
+        apply();
+      });
+    });
+    // In-page jumps from "Needs attention" must survive an active filter.
+    panel.addEventListener('click', function (e) {
+      var a = e.target.closest('a[href^="#claim-"]');
+      if (!a) return;
+      e.preventDefault();
+      var target = panel.querySelector(a.getAttribute('href').replace(/"/g, ''));
+      if (!target) return;
+      if (target.hidden) { mode = 'all'; if (search) search.value = ''; buttons.forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-docs-filter') === 'all'); }); apply(); }
+      target.scrollIntoView({ block: 'center' });
+      target.classList.add('flash');
+      setTimeout(function () { target.classList.remove('flash'); }, 1200);
+    });
+  });
 })();
 </script>
 </body>

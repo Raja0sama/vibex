@@ -1,0 +1,26 @@
+name: Report a problem with the docs
+description: Something written down is wrong, out of date, or misleading.
+title: "Docs wrong: "
+labels: [docs, intake]
+body:
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What does it say, and what is actually true?
+      description: Quote the sentence if you can. If you only know it is wrong and not what is right, say that — it is still worth filing.
+    validations: { required: true }
+  - type: dropdown
+    id: certainty
+    attributes:
+      label: How sure are you?
+      options:
+        - I know this is wrong
+        - I think this is wrong
+        - Something here confused me and I cannot tell
+    validations: { required: true }
+  - type: textarea
+    id: vibex
+    attributes:
+      label: Context
+      description: Filled in automatically if you came from a claim. Leave it as it is — it points at the exact sentence.
+      render: vibex
