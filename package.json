@@ -1,7 +1,7 @@
 {
-  "name": "@raja0sama/vibex",
+  "name": "@vibex/vibex",
   "version": "0.1.0",
-  "description": "JSON spec in, standalone interactive HTML diagram out: ERD, C4, and API endpoint catalogues. Imports OpenAPI, GraphQL SDL, and Prisma.",
+  "description": "Architecture diagrams and checkable documentation from your codebase: ERD, C4, API endpoints and lifecycle diagrams, plus a fact graph whose claims fail CI when the code moves. Imports OpenAPI, GraphQL SDL and Prisma. One standalone HTML file, zero dependencies, no server.",
   "keywords": [
     "diagram",
     "erd",
@@ -14,7 +14,13 @@
     "html",
     "cli",
     "claude-code",
-    "skill"
+    "skill",
+    "docs",
+    "documentation",
+    "changelog",
+    "lifecycle",
+    "c4-model",
+    "diagrams-as-code"
   ],
   "license": "MIT",
   "author": "Raja",
@@ -51,5 +57,8 @@
   },
   "optionalDependencies": {
     "yaml": "^2.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

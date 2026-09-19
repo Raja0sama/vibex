@@ -65,5 +65,5 @@ First release.
 4. `npm pack --dry-run` and confirm `assets/dashboard.html`, `assets/template.html`, `assets/viewer.js`, `assets/viewer.css`, `SKILL.md`, `LICENSE` are listed.
 5. `git commit -am "release x.y.z" && git tag vx.y.z && git push --follow-tags`.
 6. Wait for CI (Node 18/20/22) to be green on the tag.
-7. Optional npm path: `npm publish --access public` (runs `prepublishOnly` = `npm test`). Smoke: `npx @raja0sama/vibex@x.y.z demo /tmp/vibex-smoke`.
+7. Optional npm path: `npm publish --access public` (runs `prepublishOnly` = `npm test`). Smoke: `npx @vibex/vibex@x.y.z demo /tmp/vibex-smoke`.
 8. Skill path smoke: `npx skills add Raja0sama/vibex` in a scratch project, then `node ~/.claude/skills/vibex/bin/vibex.mjs types`.

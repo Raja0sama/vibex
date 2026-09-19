@@ -32,7 +32,7 @@ Then it documents the system in claims that fail CI when the code moves undernea
 → **one command, run against the schema that actually ships.**
 
 ```bash
-npx @raja0sama/vibex demo out && open out/dashboard.html
+npx @vibex/vibex demo out && open out/dashboard.html
 ```
 
 <!-- TODO: replace with a real screen recording of the viewer once the demo is deployed -->
@@ -299,11 +299,11 @@ A new diagram type is a schema, a validator function, a renderer that emits
 ## Install
 
 ```bash
-npx @raja0sama/vibex demo out           # the package is scoped
-npm i -g @raja0sama/vibex && vibex types
+npx @vibex/vibex demo out           # the package is scoped
+npm i -g @vibex/vibex && vibex types
 ```
 
-> The unscoped `vibex` on npm is an unrelated package. Always install `@raja0sama/vibex`.
+> The unscoped `vibex` on npm is an unrelated package. Always install `@vibex/vibex`.
 
 Node 18+. Zero required dependencies. The optional `yaml` package is only needed
 if your OpenAPI document is YAML rather than JSON.

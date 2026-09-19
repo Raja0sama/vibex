@@ -206,7 +206,7 @@ Add this once, in the project being documented. It is the step that makes the re
 ```yaml
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }      # a shallow clone cannot diff against the lock's commit
-- run: npx @raja0sama/vibex docs docs/arch/system.docs.json docs/arch --repo . --check --no-lock
+- run: npx @vibex/vibex docs docs/arch/system.docs.json docs/arch --repo . --check --no-lock
 ```
 
 `--no-lock` on purpose: the lock file is an optimisation for local iteration, and it reaches CI from a contributor's machine asserting that claims were verified. CI re-reads every anchor from scratch rather than taking that on trust. A full check of ~60 claims runs in well under a second, with no dependencies, no network and no model — so there is no reason to skip it.
