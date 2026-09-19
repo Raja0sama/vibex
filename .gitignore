@@ -3,9 +3,11 @@ out/
 *.html
 !assets/*.html
 !site/*.html
+site/demo/
 *.tgz
 .DS_Store
 .claude/
 
 # Generated docs artefacts (docs.lock.json IS committed — it is the record)
 docs.json
+changelog.json

@@ -24,10 +24,12 @@ Usage:
   vibex import openapi <openapi.json|yaml> [out.json] [--title "..."] [--all-types]
   vibex import graphql <schema.graphql>    [out.json] [--title "..."] [--erd]
   vibex import prisma  <schema.prisma>     [out.json] [--title "..."]
-  vibex dashboard <out.html> <spec.json|dir>... [--title "..."] [--subtitle "..."] [--repo <dir>] [--open] [--json]
+  vibex dashboard <out.html> <spec.json|dir>... [--title "..."] [--subtitle "..."] [--repo <dir>]
+                  [--changelog changelog.json] [--open] [--json]
                                   one HTML with every diagram, sidebar, overview, cross-links.
-                                  A *.docs.json in the set becomes a Documentation panel;
-                                  --repo lets its anchored claims be checked.
+                                  A *.docs.json in the set becomes a Documentation panel and a
+                                  changelog.json beside them becomes a Changes panel;
+                                  --repo lets anchored claims be checked.
   vibex docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo <dir>]
                  [--check] [--reanchor] [--lock docs.lock.json] [--no-lock] [--json]
                                   build the fact graph: derived facts + authored claims,
@@ -216,15 +218,19 @@ function cmdChangelog(args) {
   }
 
   const pkg = readJson(path.join(root, 'package.json'));
-  const log = buildChangelog({ commits, from, to, fromCommit, toCommit, generator: `vibex ${pkg.version}`, claimDiff });
+  const remote = run(['remote', 'get-url', 'origin']);
+  const log = buildChangelog({
+    commits, from, to, fromCommit, toCommit, claimDiff,
+    generator: `vibex ${pkg.version}`,
+    repository: remote ? { url: remote.trim() } : null,
+  });
 
   const out = path.resolve(outArg || 'changelog.json');
   writeOut(out, `${JSON.stringify(log, null, 2)}\n`);
 
   let mdOut = null;
   if (mdArg) {
-    const remote = run(['remote', 'get-url', 'origin']);
-    const repository = remote ? { url: remote.trim() } : readRepositoryFrom(specDir);
+    const repository = log.repository || readRepositoryFrom(specDir);
     mdOut = path.resolve(mdArg);
     writeOut(mdOut, changelogToMarkdown(log, { repository, title: titleArg || null }));
   }
@@ -432,6 +438,7 @@ async function cmdDashboard(args) {
   const open = boolFlag(args, '--open');
   const json = boolFlag(args, '--json');
   const repoArg = valueFlag(args, '--repo');
+  const changelogArg = valueFlag(args, '--changelog');
   rejectUnknownFlags(args);
   const [outArg, ...inputs] = args;
   if (!outArg || !inputs.length) fail(HELP);
@@ -453,7 +460,17 @@ async function cmdDashboard(args) {
   // The commit the reader is looking at, not the branch the spec names. It ends
   // up in every "report this" link, so an issue points at an exact tree.
   const commit = docsCount ? head(gitRunner(path.resolve(repoArg || process.cwd()))) : null;
-  const { html, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit });
+  // A changelog.json sitting beside the specs is picked up without being asked
+  // for; an explicit --changelog wins.
+  let changelog = null;
+  const clPath = changelogArg
+    || collectSpecFiles(inputs).find((f) => path.basename(f) === 'changelog.json');
+  if (clPath && fs.existsSync(clPath)) {
+    const loaded = readJson(clPath);
+    if (loaded?.artifact === 'changelog') changelog = loaded;
+    else console.error(`warning ${clPath} is not a changelog artefact; ignoring it`);
+  }
+  const { html, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit, changelog });
   for (const p of problems) console.error(`skipped ${p.file}: ${p.errors.map((e) => e.message).join('; ')}`);
   for (const w of warnings) console.error(`warning ${w}`);
   const out = path.resolve(outArg);

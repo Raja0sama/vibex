@@ -343,3 +343,32 @@ nav a[data-proposed] .t em{font-style:normal;font-size:10px;text-transform:upper
 .proposal-banner p{margin:6px 0 0;font-size:12.5px;color:var(--text-2);line-height:1.5}
 .proposal-banner .trail{color:var(--text-3);font-size:11.5px}
 .proposal-banner a{color:var(--c-proposed)}
+
+/* changelog panel */
+.type-badge.changelog{color:var(--text-2);background:color-mix(in srgb,var(--text-2) 10%,transparent);border-color:color-mix(in srgb,var(--text-2) 25%,transparent)}
+.cl-entries{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.cl-entry{padding-left:12px;border-left:2px solid var(--border-soft)}
+.cl-entry.breaking{border-left-color:var(--c-broken)}
+.cl-entry .t{margin:0;font-size:13.5px;line-height:1.45;color:var(--text)}
+.cl-entry .t em{font-style:normal;color:var(--text-3)}
+.cl-entry .meta{margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:11px;color:var(--text-3)}
+.cl-entry .sha{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);text-decoration:none}
+.cl-entry .sha:hover{text-decoration:underline}
+.cl-entry .guessed{border:1px dashed var(--border);border-radius:999px;padding:0 6px}
+.cl-entry .specs{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px}
+.commit-body{margin-top:6px}
+.commit-body>summary{cursor:pointer;font-size:11px;color:var(--text-3);list-style:none}
+.commit-body>summary::-webkit-details-marker{display:none}
+.commit-body>summary::before{content:"▸ ";font-size:9px}
+.commit-body[open]>summary::before{content:"▾ "}
+.commit-body pre{margin:6px 0 0;padding:9px 11px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r);font-size:11.5px;line-height:1.5;white-space:pre-wrap;color:var(--text-2)}
+
+.cl-impact{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;font-size:13px;line-height:1.5}
+.cl-impact code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:4px;padding:1px 4px}
+.cl-impact .warn{color:var(--c-stale)}
+.cl-impact .muted{color:var(--text-3);font-size:12px}
+.cl-impact .reword{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.cl-impact .reword li{display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.cl-impact .was{color:var(--text-3);text-decoration:line-through}
+.cl-impact .now{color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}

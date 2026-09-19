@@ -7,6 +7,7 @@ import { RENDERERS, embeddable } from './render.mjs';
 import { renderCards, renderLegend, assetSlots, fillSlots, embedJson, TOOLBAR_ACTIONS } from './template.mjs';
 import { buildGraph, specId } from '../docs/graph.mjs';
 import { renderDocsPanel, docsNavHtml } from '../docs/render-docs.mjs';
+import { renderChangelogPanel, changelogNavHtml } from '../changelog/render-changelog.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DASHBOARD_TEMPLATE_PATH = path.resolve(here, '../../assets/dashboard.html');
@@ -133,7 +134,7 @@ export function loadDashboardTemplate(templatePath = DASHBOARD_TEMPLATE_PATH) {
 }
 
 // specs: array of { spec, file } where file is the spec's basename without extension.
-export function renderDashboard(items, { title = 'Architecture', subtitle, theme, anchorStatus = null, commit = null, now } = {}) {
+export function renderDashboard(items, { title = 'Architecture', subtitle, theme, anchorStatus = null, commit = null, changelog = null, now } = {}) {
   const entries = [];
   const problems = [];
   const docsSpecs = [];
@@ -197,6 +198,17 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     });
     nav = `<div class="group"><h2>Documentation</h2>${docsNav}</div>` + nav;
     panels = docsPanels + panels;
+  }
+
+  // Changes last in the nav: you arrive at a system to understand it, and ask
+  // what moved once you already know what you are looking at.
+  if (changelog?.entries) {
+    const panelOf = new Map(entries.map((e) => [specId(e.spec, e.file), e.index]));
+    const labelOf = new Map(entries.map((e) => [specId(e.spec, e.file), e.spec.meta.title || e.file]));
+    const resolveSpec = (id) => (panelOf.has(id) ? { panel: panelOf.get(id), label: labelOf.get(id) } : null);
+    const repository = entries.find((e) => e.spec.meta?.repository)?.spec.meta.repository || null;
+    nav += changelogNavHtml(changelog);
+    panels += renderChangelogPanel(changelog, { repository, resolveSpec });
   }
 
   const html = fillSlots(loadDashboardTemplate(), {

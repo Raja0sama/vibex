@@ -110,7 +110,7 @@ export function specsTouched(paths) {
 }
 
 export function buildChangelog({
-  commits, from, to, fromCommit, toCommit, generator = 'vibex', now = Date.now(), claimDiff = null,
+  commits, from, to, fromCommit, toCommit, generator = 'vibex', now = Date.now(), claimDiff = null, repository = null,
 }) {
   const entries = (commits || []).map((c) => {
     const parsed = parseSubject(c.subject);
@@ -144,6 +144,7 @@ export function buildChangelog({
     generated_at: new Date(now).toISOString(),
     generator,
     range: { from: from || null, to, from_commit: fromCommit || null, to_commit: toCommit || null },
+    ...(repository ? { repository } : {}),
     sections,
     entries,
     impact: {

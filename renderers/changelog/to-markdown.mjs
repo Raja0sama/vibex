@@ -29,7 +29,8 @@ function entryLine(entry, repository) {
   return bits.join('');
 }
 
-export function changelogToMarkdown(log, { repository = null, title = null } = {}) {
+export function changelogToMarkdown(log, { repository: fallback = null, title = null } = {}) {
+  const repository = log.repository || fallback;
   const byId = new Map(log.entries.map((e) => [e.commit, e]));
   const out = [];
   const push = (...lines) => out.push(...lines);

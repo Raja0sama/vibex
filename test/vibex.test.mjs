@@ -22,6 +22,7 @@ import { issueUrl, contextBlock, issueEndpoint } from '../renderers/shared/intak
 import { parseIntake, triage, PLAYBOOK } from '../renderers/shared/triage.mjs';
 import { readCommits, buildChangelog, diffClaims, resolve as resolveRef } from '../renderers/changelog/from-git.mjs';
 import { changelogToMarkdown } from '../renderers/changelog/to-markdown.mjs';
+import { renderChangelogPanel, changelogNavHtml } from '../renderers/changelog/render-changelog.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -1171,4 +1172,72 @@ test('changelog: git failing is unknown, never "nothing changed"', () => {
   }), {});
   assert.match(md, /and 28 more/);
   assert.ok(!md.includes('claim.39'), 'the tail is summarised, not printed');
+});
+
+test('changelog panel: it sits beside the diagrams it names, and links to the right history', () => {
+  const log = buildChangelog({
+    commits: readCommits(fakeGit([
+      { sha: 'a'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'fix!: change the shape', body: 'why it happened\n\nCo-Authored-By: Someone <x@y.z>', paths: ['docs/orders.erd.json'] },
+    ]), 'v1', 'HEAD'),
+    from: 'v1',
+    to: 'HEAD',
+    now: NOW,
+    // The commits came from here; a spec may describe an entirely different system.
+    repository: { url: 'https://github.com/acme/tool.git' },
+    claimDiff: { added: ['a'], removed: ['b'], superseded: [], reworded: [{ id: 'c', was: 'twelve hours', now: 'two hours' }], derived_added: 3, derived_removed: 0 },
+  });
+
+  const html = renderChangelogPanel(log, {
+    repository: { url: 'https://github.com/someone/else' },
+    resolveSpec: (id) => (id === 'orders.erd' ? { panel: 2, label: 'Orders domain' } : null),
+  });
+
+  assert.ok(html.includes('data-panel="changelog"'));
+  assert.match(html, /github\.com\/acme\/tool\/commit\/a{40}/, 'links follow the commits, not the specs');
+  assert.ok(!html.includes('someone/else'), 'the spec repository does not win');
+
+  // The chip is the reason this belongs in the dashboard at all.
+  assert.match(html, /data-goto-panel="2"[^>]*>Orders domain/);
+  // A rewording is shown as the change it was, not as a bare id.
+  assert.match(html, /twelve hours[\s\S]*two hours/);
+  assert.match(html, /check these were meant to go/);
+  assert.match(html, /3 derived fact/);
+  // A trailer is noise in a changelog.
+  assert.ok(!html.includes('Co-Authored-By'));
+  // This fixture uses a conventional prefix, so the section is the author's
+  // intent and carries no guess badge — and it is marked breaking.
+  assert.ok(!html.includes('sorted by paths'));
+  assert.match(html, /class="cl-entry breaking"/);
+
+  // A prose commit does get the badge, and the aside explains it.
+  const guessed = renderChangelogPanel(buildChangelog({
+    commits: readCommits(fakeGit([
+      { sha: 'c'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'just some words', paths: ['src/x.ts'] },
+    ]), 'v1', 'HEAD'),
+    from: 'v1', to: 'HEAD', now: NOW,
+  }), {});
+  assert.match(guessed, /sorted by paths/);
+  assert.match(guessed, /not from its message/);
+
+  assert.match(changelogNavHtml(log), /data-panel="changelog"/);
+});
+
+test('changelog panel: the dashboard shows one when a changelog artefact is supplied', () => {
+  const items = DIAGRAM_EXAMPLES.map((n) => ({ file: n.replace(/\.json$/, ''), spec: json(`examples/${n}`) }));
+  const changelog = buildChangelog({
+    commits: readCommits(fakeGit([
+      { sha: 'b'.repeat(40), author: 'Ana', at: '2026-09-19T00:00:00Z', subject: 'touch the data model', paths: ['examples/orders.erd.json'] },
+    ]), 'v1', 'HEAD'),
+    from: 'v1', to: 'HEAD', now: NOW,
+  });
+
+  const withLog = renderDashboard(items, { title: 'T', changelog });
+  assert.ok(withLog.html.includes('data-panel="changelog"'));
+  const erd = withLog.entries.find((e) => e.spec.diagram_type === 'erd');
+  assert.ok(withLog.html.includes(`data-goto-panel="${erd.index}"`), 'the touched spec resolves to its panel');
+
+  // Without one, nothing changes: the panel is additive.
+  const without = renderDashboard(items, { title: 'T' });
+  assert.ok(!without.html.includes('data-panel="changelog"'));
+  assert.equal(without.entries.length, withLog.entries.length, 'it takes no diagram slot');
 });

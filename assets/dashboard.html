@@ -196,6 +196,7 @@ nav .foot button{width:auto;margin:0}
     if (d) return { id: d[1], node: node ? decode(node[1]) : null };
     var docs = /^#(docs)(?:-(\d+))?(?:$|[&/])/.exec(hash);
     if (docs) return { id: 'docs-' + (docs[2] || '0'), node: null };
+    if (/^#changelog\b/.test(hash)) return { id: 'changelog', node: null };
     if (/^#?$/.test(hash)) return { id: 'overview', node: null };
     return null;
   }

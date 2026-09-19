@@ -245,6 +245,13 @@ Reads the commits in a range and writes two things: a JSON artefact to keep in t
 - **Sections are a guess unless the project uses conventional commits.** When they are, the artefact and the Markdown both say so. Do not present an inferred grouping as the author's intent.
 - A commit is only `internal` when *every* path it touched was.
 
+Write `changelog.json` next to the specs and `vibex dashboard` picks it up as a Changes panel, where each entry's specs are chips that open the diagram they touched:
+
+```bash
+node bin/vibex.mjs changelog v1.2.0..main --specs docs/arch -o docs/arch/changelog.json
+node bin/vibex.mjs dashboard docs/arch/index.html docs/arch --repo .
+```
+
 Report the counts line as it prints, and if claims were **removed**, say so out loud — a claim that vanished took whatever it documented with it, and that is worth a human checking.
 
 ## Authoring rules
