@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, wrapText, fitChars, num, cellIndex } from '../shared/utils.mjs';
-import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets } from '../shared/layout.mjs';
+import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const MARGIN = 40;
@@ -164,6 +164,10 @@ export function renderLifecycle(spec) {
   const rects = placement.placed;
   const transitions = spec.transitions || [];
   const offsets = portOffsets(transitions, rects, 20);
+  // Transitions crossing the same gap otherwise all turn at its midpoint, which
+  // stacks their labels into one column. Same lane assignment as C4 and ERD.
+  const channels = channelOffsets(transitions, rects, offsets);
+  for (let i = 0; i < transitions.length; i += 1) offsets[i].channel = channels[i];
   const obstacles = [...rects.values()].map((r) => ({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 }));
   let body = '';
   let labels = '';
