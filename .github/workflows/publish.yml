@@ -1,0 +1,73 @@
+name: publish
+
+# Publishing from a laptop needs an interactive 2FA prompt. Publishing from here
+# needs a granular access token with "bypass 2FA" enabled, stored as the NPM_TOKEN
+# secret — which also means the release is reproducible from a tag rather than
+# from whatever happened to be in someone's working tree.
+#
+# Release:  git tag v0.1.0 && git push --tags
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack and verify, but do not publish'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # A tag that disagrees with package.json ships a version nobody can trace
+      # back to a commit. Fail before anything leaves the machine.
+      - name: the tag must match package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          echo "tag=$tag  package.json=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag v$tag does not match package.json $pkg. Bump one of them."
+            exit 1
+          fi
+
+      - run: npm test
+
+      # The demo is the first thing anyone runs after installing. If it cannot
+      # run from the packed tarball, the release is broken no matter what the
+      # unit tests say.
+      - name: the packed tarball must actually work
+        run: |
+          npm pack
+          tgz=$(ls ./*.tgz)
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE/$tgz" > /dev/null
+          npx vibex types
+          npx vibex demo ./out
+          test -f ./out/dashboard.html
+          test -f ./out/orders.erd.html
+          echo "tarball smoke test passed"
+
+      - name: publish
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.dry_run == false
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: dry run only
+        if: "!startsWith(github.ref, 'refs/tags/v') && inputs.dry_run != false"
+        run: echo "Verified but not published. Re-run with dry_run=false, or push a v* tag."
