@@ -210,6 +210,9 @@ function cmdChangelog(args) {
 
   // Only meaningful with both ends and somewhere to look for specs.
   let claimDiff = null;
+  if (specDir && !from) {
+    console.error('warning --specs needs two ends to compare; give a range such as v1.2.0..HEAD to see what changed in the documentation');
+  }
   if (specDir && fromCommit && toCommit) {
     const before = claimsAt(run, from, specDir);
     const after = claimsAt(run, to, specDir);

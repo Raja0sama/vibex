@@ -11,3 +11,6 @@ site/demo/
 # Generated docs artefacts (docs.lock.json IS committed — it is the record)
 docs.json
 changelog.json
+# ...except the showcase's, which is a fixture describing a fictional release
+# of a fictional company, not a build artefact of this repository.
+!showcase/changelog.json

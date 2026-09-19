@@ -51,7 +51,11 @@ function entryHtml(entry, { repository, resolveSpec }) {
 function impactHtml(log) {
   const c = log.impact.claims;
   if (!c) {
-    return `<p class="empty-note">Run <code>vibex changelog --specs &lt;dir&gt;</code> to see what these commits did to the documentation.</p>`;
+    // Two different reasons land here, and telling someone to pass a flag they
+    // already passed is how a message loses a reader's trust.
+    return log.range.from
+      ? `<p class="empty-note">Not computed. Pass <code>--specs &lt;dir&gt;</code> to <code>vibex changelog</code> to see what these commits did to the documentation.</p>`
+      : `<p class="empty-note">A documentation diff needs two ends to compare. This range has only one — rebuild with a range such as <code>v1.2.0..HEAD</code>.</p>`;
   }
   const rows = [];
   const ids = (list) => list.map((id) => `<code>${esc(id)}</code>`).join(', ');
