@@ -109,8 +109,9 @@ jobs:
       # documentation you can trust.
       - name: the packed tarball must work from a clean install
         run: |
+          mkdir -p /tmp/pkg /tmp/install
           npm pack --pack-destination /tmp/pkg
-          mkdir -p /tmp/install && tar xzf /tmp/pkg/*.tgz -C /tmp/install
+          tar xzf /tmp/pkg/*.tgz -C /tmp/install
           cd /tmp/install/package
           node bin/vibex.mjs demo out
           node -e '

@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, fitChars, num } from '../shared/utils.mjs';
-import { gridPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets } from '../shared/layout.mjs';
+import { gridPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const ROW_H = 20;
@@ -169,6 +169,10 @@ export function renderErd(spec) {
 
   const rels = spec.relationships || [];
   const offsets = portOffsets(rels, rects, 18);
+  // Relationships crossing the same gap otherwise all turn at its midpoint,
+  // stacking their cardinality labels into one column. Same fix as C4.
+  const channels = channelOffsets(rels, rects, offsets);
+  for (let i = 0; i < rels.length; i += 1) offsets[i].channel = channels[i];
   const obstacles = [...rects.values()].map((r) => ({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 }));
   let labels = '';
   // Place the widest labels first so they get the roomy spots.
