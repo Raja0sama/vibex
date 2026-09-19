@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifecycle.schema.json",
+  "title": "vibeX lifecycle / state diagram",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "states"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "lifecycle" },
+    "meta": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/meta" }],
+      "properties": {
+        "subject": { "type": "string", "description": "What carries the state, e.g. Order.status or Subscription.state" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "direction": { "enum": ["lr", "tb"], "default": "lr", "description": "Flow of the happy path: left-to-right or top-to-bottom" },
+        "gapX": { "type": "number", "minimum": 0 },
+        "gapY": { "type": "number", "minimum": 0 }
+      }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id", "description": "Stable id; use the enum value from code when there is one" },
+          "label": { "type": "string" },
+          "kind": { "enum": ["initial", "normal", "waiting", "terminal", "failure"], "default": "normal", "description": "initial = entry point (gets a start dot); waiting = parked until an external event; terminal = no way out; failure = error/rejected state, may be recoverable" },
+          "description": { "type": "string", "description": "What is true while in this state, one sentence" },
+          "actor": { "type": "string", "description": "Who acts next while in this state: buyer, admin, system, payment provider..." },
+          "row": { "type": "integer", "minimum": 0, "maximum": 1000, "description": "Optional manual rank override" },
+          "col": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "from": { "$ref": "common.schema.json#/$defs/id" },
+          "to": { "$ref": "common.schema.json#/$defs/id" },
+          "event": { "type": "string", "description": "What triggers it: submit, approve, paymentReceived, 7 days elapsed" },
+          "guard": { "type": "string", "description": "Condition, without brackets: the basket is not empty, amount > 0" },
+          "action": { "type": "string", "description": "Side effect: notify admin, issue invoice" },
+          "actor": { "type": "string", "description": "Who triggers it: buyer, admin, system" },
+          "kind": { "enum": ["normal", "auto", "timeout", "failure"], "default": "normal", "description": "auto/timeout = system-driven (dashed); failure = error path (red)" },
+          "label": { "type": "string", "description": "Override the rendered first line (default: event)" },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "cards": { "$ref": "common.schema.json#/$defs/cards" }
+  }
+}

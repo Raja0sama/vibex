@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-theme-pref="<!-- VIBEX:THEME -->">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!-- VIBEX:TITLE --></title>
+<style>
+<!-- VIBEX:CSS -->
+body{display:grid;grid-template-columns:252px minmax(0,1fr);height:100vh}
+nav{border-right:1px solid var(--border-soft);background:var(--surface);display:flex;flex-direction:column;overflow:auto}
+nav .brand{display:flex;align-items:center;gap:10px;padding:16px 16px 14px;border-bottom:1px solid var(--border-soft)}
+nav .brand .mark{width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,var(--patch)));display:grid;place-items:center;box-shadow:var(--shadow-sm)}
+nav .brand .mark svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav .brand .txt{min-width:0}
+nav .brand h1{font-size:14px;font-weight:680;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav .brand .sub{color:var(--text-3);font-size:11.5px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav .group{padding:12px 10px 2px}
+nav .group h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-weight:650;padding:0 8px 7px}
+nav a{position:relative;display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--text-2);text-decoration:none;font-size:13px;cursor:pointer;min-width:0;transition:background-color .12s,color .12s}
+nav a .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+nav a .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--text-3)}
+nav a[data-type=erd] .dot{background:var(--pk)}
+nav a[data-type=c4] .dot{background:var(--system)}
+nav a[data-type=endpoints] .dot{background:var(--get)}
+nav a[data-type=lifecycle] .dot{background:var(--patch)}
+nav a:hover{background:var(--surface-2);color:var(--text)}
+nav a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+nav a.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+nav a.active::before{content:"";position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:3px;height:16px;border-radius:0 3px 3px 0;background:var(--accent)}
+nav a .n{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);background:var(--surface-2);border-radius:99px;padding:1px 6px;flex:none}
+nav a.active .n{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+nav .foot{margin-top:auto;padding:13px 15px;font-size:10.5px;color:var(--text-3);border-top:1px solid var(--border-soft);line-height:1.9}
+nav .foot kbd{font-family:var(--font-mono);font-size:10px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:4px;padding:1px 4px;color:var(--text-2)}
+nav .foot button{width:100%;margin-top:9px;justify-content:center}
+main{min-height:0;display:flex;flex-direction:column;background:var(--bg)}
+.panel{display:none;min-height:0;height:100%}
+.panel.active{display:flex;flex-direction:column}
+.panel .viewer{flex:1;min-height:0}
+/* overview */
+.overview{padding:26px 30px 40px;overflow:auto}
+.overview>*{max-width:1120px}
+.ov-head{max-width:900px;margin:0 0 26px}
+.overview h1{font-size:22px;font-weight:700;letter-spacing:-.018em}
+.overview .lead{color:var(--text-3);margin:6px 0 0;font-size:13.5px;line-height:1.5}
+.stat-strip{display:flex;flex-wrap:wrap;gap:0;margin-top:18px;background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);overflow:hidden}
+.stat{flex:1 1 110px;padding:13px 18px;border-right:1px solid var(--border-soft)}
+.stat:last-child{border-right:none}
+.stat b{display:block;font-size:21px;font-weight:680;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{display:block;font-size:11px;color:var(--text-3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.overview h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-weight:650;margin:28px 0 12px;display:flex;align-items:center;gap:10px}
+.overview h2::after{content:"";flex:1;height:1px;background:var(--border-soft)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:13px}
+.tile{border:1px solid var(--border-soft);border-radius:var(--r-lg);background:var(--surface);padding:15px 17px;cursor:pointer;display:flex;flex-direction:column;gap:5px;color:inherit;text-decoration:none;box-shadow:var(--shadow-sm);transition:transform .14s,box-shadow .14s,border-color .14s}
+.tile:hover,.tile:focus-visible{border-color:var(--border);box-shadow:var(--shadow-lg);transform:translateY(-2px);outline:none}
+.tile:focus-visible{border-color:var(--accent)}
+.tile .row{display:flex;align-items:center;gap:9px}
+.tile h3{font-size:14.5px;font-weight:650;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .row .type-badge{margin-left:auto}
+.tile .sub{color:var(--text-3);font-size:12.5px;line-height:1.45;min-height:18px}
+.tile .counts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:7px;padding-top:10px;border-top:1px solid var(--border-soft);font-size:11.5px;color:var(--text-3)}
+.tile .counts b{color:var(--text);font-weight:650;font-variant-numeric:tabular-nums}
+.xlinks{border:1px solid var(--border-soft);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-sm);overflow:hidden}
+.xlinks table{width:100%;border-collapse:collapse;font-size:12.5px}
+.xlinks td{padding:9px 16px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+.xlinks tr:last-child td{border-bottom:none}
+.xlinks tr:hover td{background:var(--surface-2)}
+.xlinks td:first-child{white-space:nowrap;width:1%;border-right:1px solid var(--border-soft)}
+.xlinks .chip{margin:1px 2px}
+.xlinks .arrow{color:var(--text-3)}
+.empty-note{color:var(--text-3);font-size:13px;background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-lg);padding:16px 18px;margin:0}
+.empty-note code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);border-radius:4px;padding:1px 5px}
+@media (max-width:900px){
+body{grid-template-columns:minmax(0,1fr);height:auto}
+nav{border-right:none;border-bottom:1px solid var(--border-soft);min-width:0;overflow:visible}
+nav .brand{padding:12px 14px 10px;border-bottom:none}
+nav .group{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:4px 12px 8px;scrollbar-width:thin}
+nav .group h2{padding:0 4px 0 0;white-space:nowrap}
+nav a{flex:none;padding:5px 11px;border:1px solid var(--border-soft);border-radius:999px;font-size:12.5px}
+nav a.active::before{display:none}
+nav a .n{display:none}
+nav .foot{margin-top:0;padding:2px 14px 10px;border-top:none;display:flex;justify-content:flex-end}
+nav .foot .keys{display:none}
+nav .foot button{width:auto;margin:0}
+.panel .viewer{flex:none}
+.overview{padding:18px 16px 30px}
+.stat-strip{display:grid;grid-template-columns:1fr 1fr}
+.stat{padding:11px 14px;border-bottom:1px solid var(--border-soft)}
+.stat:nth-child(2n){border-right:none}
+.stat:nth-last-child(-n+2){border-bottom:none}
+.stat b{font-size:18px}
+.xlinks td{padding:8px 12px}
+}
+</style>
+</head>
+<body>
+<nav>
+  <div class="brand">
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="4" cy="12" r="2"/><path d="M5.8 4.9 10.2 7.1M10.2 8.9 5.8 11.1"/></svg></span>
+    <span class="txt"><h1><!-- VIBEX:TITLE --></h1><div class="sub"><!-- VIBEX:SUBTITLE --></div></span>
+  </div>
+  <div class="group"><a href="#" data-panel="overview" class="active" aria-current="page"><span class="dot"></span><span class="t">Overview</span></a></div>
+  <!-- VIBEX:NAV -->
+  <div class="foot"><span class="keys"><kbd>/</kbd> search · <kbd>esc</kbd> clear · <kbd>t</kbd> theme · <kbd>0</kbd> fit</span><button type="button" data-role="theme-global">Toggle theme</button></div>
+</nav>
+<main>
+  <section class="panel overview active" data-panel="overview"><!-- VIBEX:OVERVIEW --></section>
+  <!-- VIBEX:PANELS -->
+</main>
+<script id="vibex-specs" type="application/json"><!-- VIBEX:SPECS --></script>
+<script>
+<!-- VIBEX:VIEWER_JS -->
+</script>
+<script>
+(function () {
+  var specs = JSON.parse(document.getElementById('vibex-specs').textContent);
+  var viewers = {};
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.panel'));
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav a[data-panel], [data-goto-panel]'));
+
+  // Where does an id live? First diagram that has it, preferring ERD for entities.
+  function whereIs(id, preferType) {
+    var hits = [];
+    specs.forEach(function (s, i) {
+      ['entities', 'elements', 'endpoints', 'types', 'groups', 'boundaries'].forEach(function (c) {
+        if ((s[c] || []).some(function (x) { return x.id === id; })) hits.push({ diagram: String(i), type: s.diagram_type, collection: c });
+      });
+    });
+    if (preferType) { var p = hits.find(function (h) { return h.type === preferType; }); if (p) return p; }
+    return hits[0] || null;
+  }
+  function crossLinks(id, collection, selfIndex) {
+    var out = [];
+    specs.forEach(function (s, i) {
+      if (String(i) === String(selfIndex)) return;
+      if (collection === 'entities') {
+        (s.endpoints || []).forEach(function (ep) {
+          if ((ep.entities || []).indexOf(id) !== -1) out.push({ diagram: String(i), nodeId: ep.id, label: ep.method + ' ' + ep.path });
+        });
+      }
+      ['entities', 'elements'].forEach(function (c) {
+        if ((s[c] || []).some(function (x) { return x.id === id; })) out.push({ diagram: String(i), nodeId: id, label: (s.meta.title || 'diagram') + ' › ' + id });
+      });
+    });
+    return out;
+  }
+  function resolveLink(href) {
+    var base = String(href).split('/').pop().replace(/\.html$/, '');
+    var i = specs.findIndex(function (s) { return s.__file === base || s.__file === base + '.json'; });
+    return i === -1 ? null : String(i);
+  }
+  function panelFor(id) { return /^\d+$/.test(String(id)) ? document.querySelector('.panel[data-panel="' + id + '"]') : null; }
+  function ensureViewer(i) {
+    if (viewers[i]) return viewers[i];
+    var panel = panelFor(i);
+    if (!panel) return null;
+    var root = panel.querySelector('[data-role=viewer]');
+    viewers[i] = new VibexViewer(root, specs[i], {
+      resolveExternal: function (id) { return whereIs(id); },
+      onMissingNode: function (id) { var w = whereIs(id, 'erd'); if (w) show(w.diagram, id); },
+      crossLinks: function (id, collection) { return crossLinks(id, collection, i); },
+      resolveLink: resolveLink,
+      gotoDiagram: function (d, nodeId) { show(d, nodeId); },
+      onSelect: function (id) { history.replaceState(null, '', '#d=' + i + '&node=' + encodeURIComponent(id)); },
+    });
+    return viewers[i];
+  }
+  function show(id, nodeId) {
+    if (id !== 'overview' && !panelFor(id)) id = 'overview';
+    panels.forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-panel') === String(id)); });
+    document.querySelectorAll('nav a[data-panel]').forEach(function (a) {
+      var active = a.getAttribute('data-panel') === String(id);
+      a.classList.toggle('active', active);
+      if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    if (id !== 'overview') {
+      var v = ensureViewer(id);
+      if (nodeId) v.selectNode(nodeId);
+      else history.replaceState(null, '', '#d=' + id);
+    } else history.replaceState(null, '', '#');
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-panel], [data-goto-panel]');
+    if (!t || t.closest('.panel') && !t.hasAttribute('data-goto-panel')) return;
+    e.preventDefault();
+    show(t.getAttribute('data-goto-panel') || t.getAttribute('data-panel'), t.getAttribute('data-goto-node'));
+  });
+  document.querySelector('[data-role=theme-global]').addEventListener('click', function () { VibexTheme.toggle(); });
+  function decode(v) { try { return decodeURIComponent(v); } catch (e) { return null; } }
+  var m = /[#&]d=(\d+)/.exec(location.hash), n = /[#&]node=([^&]+)/.exec(location.hash);
+  if (m) show(m[1], n ? decode(n[1]) : null);
+})();
+</script>
+</body>
+</html>

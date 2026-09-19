@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "diagram_type": "endpoints",
+  "meta": {
+    "title": "Order API",
+    "subtitle": "REST surface of the Order service",
+    "api_kind": "rest",
+    "base_url": "https://api.shop.example/v1",
+    "version": "1.4.0",
+    "repository": { "url": "https://github.com/example/shop-api", "revision": "main" }
+  },
+  "groups": [
+    { "id": "orders", "label": "Orders", "description": "Checkout and order lifecycle", "sources": [{ "path": "src/orders/orders.controller.ts" }] },
+    { "id": "payments", "label": "Payments" },
+    { "id": "admin", "label": "Admin", "description": "Requires the ops role" }
+  ],
+  "endpoints": [
+    { "id": "list-orders", "group": "orders", "method": "GET", "path": "/orders", "summary": "List the caller's orders, newest first", "auth": "bearer", "response": "Order[]", "status": [200, 401], "params": [{ "name": "status", "in": "query", "type": "OrderStatus" }, { "name": "cursor", "in": "query", "type": "string" }], "entities": ["order"], "sources": [{ "path": "src/orders/orders.controller.ts", "line": 24 }] },
+    { "id": "create-order", "group": "orders", "method": "POST", "path": "/orders", "summary": "Create a draft order from the cart", "auth": "bearer", "request": "CreateOrderInput", "response": "Order", "status": [201, 400, 401], "entities": ["order", "order_item"], "sources": [{ "path": "src/orders/orders.controller.ts", "line": 41 }] },
+    { "id": "get-order", "group": "orders", "method": "GET", "path": "/orders/{id}", "summary": "Fetch one order with items", "auth": "bearer", "response": "Order", "status": [200, 404], "entities": ["order"] },
+    { "id": "cancel-order", "group": "orders", "method": "POST", "path": "/orders/{id}/cancel", "summary": "Cancel before payment capture", "auth": "bearer", "response": "Order", "status": [200, 409], "entities": ["order"] },
+    { "id": "delete-order-legacy", "group": "orders", "method": "DELETE", "path": "/orders/{id}", "summary": "Removed in v2, use cancel", "auth": "bearer", "status": [204], "deprecated": true },
+    { "id": "create-payment", "group": "payments", "method": "POST", "path": "/orders/{id}/payments", "summary": "Start a Stripe payment intent", "auth": "bearer", "request": "CreatePaymentInput", "response": "Payment", "status": [201, 402, 409], "entities": ["payment"] },
+    { "id": "stripe-webhook", "group": "payments", "method": "POST", "path": "/webhooks/stripe", "summary": "Stripe event callback (signature verified)", "auth": "stripe-signature", "status": [200, 400], "entities": ["payment", "order"] },
+    { "id": "admin-list-orders", "group": "admin", "method": "GET", "path": "/admin/orders", "summary": "All orders with filters", "auth": "bearer + role:ops", "response": "Order[]", "status": [200, 403] },
+    { "id": "admin-refund", "group": "admin", "method": "POST", "path": "/admin/orders/{id}/refund", "summary": "Refund a captured payment", "auth": "bearer + role:ops", "request": "RefundInput", "response": "Payment", "status": [200, 403, 409] },
+    { "id": "order-paid-event", "group": "orders", "method": "EVENT", "path": "order.paid", "summary": "Published to SQS after capture", "response": "OrderPaidEvent" }
+  ],
+  "types": [
+    { "id": "Order", "name": "Order", "fields": [{ "name": "id", "type": "uuid", "required": true }, { "name": "status", "type": "OrderStatus", "required": true }, { "name": "items", "type": "OrderItem[]", "required": true }, { "name": "totalCents", "type": "int", "required": true }, { "name": "placedAt", "type": "datetime" }] },
+    { "id": "OrderItem", "name": "OrderItem", "fields": [{ "name": "productId", "type": "uuid", "required": true }, { "name": "quantity", "type": "int", "required": true }, { "name": "unitPriceCents", "type": "int", "required": true }] },
+    { "id": "CreateOrderInput", "name": "CreateOrderInput", "kind": "input", "fields": [{ "name": "items", "type": "OrderItemInput[]", "required": true }, { "name": "shippingAddressId", "type": "uuid" }] },
+    { "id": "Payment", "name": "Payment", "fields": [{ "name": "id", "type": "uuid", "required": true }, { "name": "provider", "type": "string", "required": true }, { "name": "capturedAt", "type": "datetime" }] },
+    { "id": "OrderStatus", "name": "OrderStatus", "kind": "enum", "values": ["draft", "placed", "paid", "shipped", "cancelled"] }
+  ],
+  "cards": [
+    { "title": "Auth", "tone": "info", "items": ["Bearer JWT from the BFF session", "Admin routes additionally check role:ops", "Stripe webhook uses signature header, no JWT"] }
+  ]
+}

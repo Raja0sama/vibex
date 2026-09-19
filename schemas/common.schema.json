@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "vibeX shared definitions",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]*$" },
+    "meta": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "subtitle": { "type": "string" },
+        "description": { "type": "string" },
+        "theme": { "enum": ["light", "dark", "auto"], "default": "auto" },
+        "repository": {
+          "type": "object",
+          "required": ["url"],
+          "properties": {
+            "url": { "type": "string", "pattern": "^https?://", "description": "Web URL of the repo, e.g. https://github.com/org/repo. Only http(s) URLs are accepted." },
+            "revision": { "type": "string", "description": "Branch, tag, or commit SHA used in source links. Default HEAD." }
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "Where this thing lives in code. Rendered as links when meta.repository.url is set.",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string", "description": "Repo-relative POSIX path: no leading slash, drive letter, URL scheme, or \"..\" segment" },
+          "line": { "type": "integer", "minimum": 1 },
+          "end_line": { "type": "integer", "minimum": 1 },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "cards": {
+      "type": "array",
+      "description": "Optional notes shown under the diagram. Max 4 recommended.",
+      "items": {
+        "type": "object",
+        "required": ["title", "items"],
+        "properties": {
+          "title": { "type": "string" },
+          "tone": { "enum": ["neutral", "info", "success", "warning", "danger"] },
+          "items": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "name": "@raja0sama/vibex",
+  "version": "0.1.0",
+  "description": "JSON spec in, standalone interactive HTML diagram out: ERD, C4, and API endpoint catalogues. Imports OpenAPI, GraphQL SDL, and Prisma.",
+  "keywords": [
+    "diagram",
+    "erd",
+    "c4",
+    "architecture",
+    "openapi",
+    "graphql",
+    "prisma",
+    "svg",
+    "html",
+    "cli",
+    "claude-code",
+    "skill"
+  ],
+  "license": "MIT",
+  "author": "Raja",
+  "homepage": "https://github.com/Raja0sama/vibex#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raja0sama/vibex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Raja0sama/vibex/issues"
+  },
+  "type": "module",
+  "bin": {
+    "vibex": "bin/vibex.mjs"
+  },
+  "files": [
+    "bin/",
+    "renderers/",
+    "importers/",
+    "assets/",
+    "schemas/",
+    "examples/",
+    "SKILL.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "demo": "node bin/vibex.mjs demo out",
+    "prepublishOnly": "npm test"
+  },
+  "optionalDependencies": {
+    "yaml": "^2.6.0"
+  }
+}

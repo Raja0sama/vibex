@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Petstore", "version": "1.0.0", "description": "A tiny pet store API. Used as an importer fixture." },
+  "servers": [{ "url": "https://petstore.example/v1" }],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [{ "name": "pets", "description": "Everything about pets" }, { "name": "owners" }],
+  "paths": {
+    "/pets": {
+      "get": { "tags": ["pets"], "operationId": "listPets", "summary": "List all pets", "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" } }], "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Pet" } } } } } } },
+      "post": { "tags": ["pets"], "operationId": "createPet", "summary": "Create a pet", "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NewPet" } } } }, "responses": { "201": { "description": "created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } } } }, "400": { "description": "bad" } } }
+    },
+    "/pets/{petId}": {
+      "parameters": [{ "name": "petId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "get": { "tags": ["pets"], "operationId": "getPet", "summary": "Get a pet", "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } } } }, "404": { "description": "missing" } } },
+      "delete": { "tags": ["pets"], "operationId": "deletePet", "summary": "Delete a pet", "deprecated": true, "responses": { "204": { "description": "gone" } } }
+    },
+    "/owners/{ownerId}/pets": {
+      "get": { "tags": ["owners"], "summary": "Pets of an owner", "security": [], "parameters": [{ "name": "ownerId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "ok", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Pet" } } } } } } }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
+    "schemas": {
+      "Pet": { "type": "object", "required": ["id", "name"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "species": { "$ref": "#/components/schemas/Species" }, "owner": { "$ref": "#/components/schemas/Owner" } } },
+      "NewPet": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" }, "species": { "$ref": "#/components/schemas/Species" } } },
+      "Owner": { "type": "object", "properties": { "id": { "type": "string" }, "email": { "type": "string", "format": "email" } } },
+      "Species": { "type": "string", "enum": ["cat", "dog", "parrot"] },
+      "Unused": { "type": "object", "properties": { "x": { "type": "integer" } } }
+    }
+  }
+}

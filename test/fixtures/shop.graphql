@@ -1,0 +1,59 @@
+"""Root queries"""
+type Query {
+  "Fetch the signed-in user"
+  me: User
+  order(id: ID!): Order
+  orders(status: OrderStatus, first: Int = 20, after: String): OrderConnection!
+}
+
+type Mutation {
+  placeOrder(input: PlaceOrderInput!): Order! @auth(requires: USER)
+  cancelOrder(id: ID!): Order!
+}
+
+type Subscription {
+  orderUpdated(id: ID!): Order!
+}
+
+type User implements Node @key(fields: "id") {
+  id: ID!
+  email: String!
+  orders: [Order!]!
+}
+
+"An order placed by a user"
+type Order implements Node {
+  id: ID!
+  status: OrderStatus!
+  total: Money!
+  user: User!
+  items: [OrderItem!]!
+  payment: Payment
+}
+
+type OrderItem {
+  productId: ID!
+  quantity: Int!
+}
+
+type Payment {
+  id: ID!
+  provider: String!
+  order: Order!
+}
+
+type OrderConnection { nodes: [Order!]!, totalCount: Int! }
+
+input PlaceOrderInput {
+  items: [OrderItemInput!]!
+  shippingAddressId: ID
+}
+input OrderItemInput { productId: ID!, quantity: Int! = 1 }
+
+enum OrderStatus { DRAFT PLACED PAID CANCELLED }
+scalar Money
+interface Node { id: ID! }
+union SearchResult = User | Order
+directive @auth(requires: Role = USER) on FIELD_DEFINITION
+directive @key(fields: String!) on OBJECT
+enum Role { USER ADMIN }

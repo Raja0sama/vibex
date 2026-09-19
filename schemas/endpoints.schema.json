@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "endpoints.schema.json",
+  "title": "vibeX API endpoints catalogue",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "endpoints"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "endpoints" },
+    "meta": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/meta" }],
+      "properties": {
+        "api_kind": { "enum": ["rest", "graphql", "mixed"], "default": "rest" },
+        "base_url": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "columns": { "type": "integer", "minimum": 1, "maximum": 4, "description": "Masonry columns for group cards. Default by group count." },
+        "card_width": { "type": "number", "minimum": 320, "default": 480 },
+        "show_types": { "type": "boolean", "default": true, "description": "Render the types section when types are present" }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "description": "Resource / tag / controller grouping. Endpoints without a group land in 'default'.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "endpoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "method", "path"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "group": { "$ref": "common.schema.json#/$defs/id" },
+          "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "QUERY", "MUTATION", "SUBSCRIPTION", "EVENT"] },
+          "path": { "type": "string", "description": "REST: /users/{id}. GraphQL: operationName(arg: Type). EVENT: topic or channel name." },
+          "summary": { "type": "string" },
+          "description": { "type": "string" },
+          "auth": { "type": "string", "description": "none, bearer, api-key, session, role names... free text, short" },
+          "request": { "type": "string", "description": "Request body / input type name" },
+          "response": { "type": "string", "description": "Response / return type name" },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "in": { "enum": ["path", "query", "header", "arg", "body"] },
+                "type": { "type": "string" },
+                "required": { "type": "boolean" }
+              }
+            }
+          },
+          "status": { "type": "array", "items": { "type": ["integer", "string"] }, "description": "REST status codes" },
+          "deprecated": { "type": "boolean" },
+          "entities": { "type": "array", "items": { "type": "string" }, "description": "ERD entity ids this endpoint reads or writes" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "types": {
+      "type": "array",
+      "description": "Schemas / GraphQL types worth showing. Keep to the ones endpoints reference.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["object", "input", "enum", "interface", "union", "scalar"], "default": "object" },
+          "description": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string" },
+                "required": { "type": "boolean" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "values": { "type": "array", "items": { "type": "string" } },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "cards": { "$ref": "common.schema.json#/$defs/cards" }
+  }
+}

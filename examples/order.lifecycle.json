@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "id": "order.lifecycle",
+    "title": "Order lifecycle",
+    "subtitle": "Every state an order reaches, and the only moves between them",
+    "subject": "Order.status",
+    "repository": { "url": "https://github.com/example/shop-api", "revision": "main" }
+  },
+  "states": [
+    { "id": "draft", "label": "Draft", "kind": "initial", "actor": "buyer", "description": "In the basket, not yet submitted", "sources": [{ "path": "src/orders/order.state.ts", "line": 14 }] },
+    { "id": "placed", "label": "Placed", "actor": "payment provider", "description": "Submitted, waiting for the card to clear" },
+    { "id": "payment_failed", "label": "Payment failed", "kind": "failure", "actor": "buyer", "description": "Declined. The buyer can try another card." },
+    { "id": "paid", "label": "Paid", "actor": "ops", "description": "Captured and stock reserved, waiting for dispatch" },
+    { "id": "shipped", "label": "Shipped", "actor": "carrier", "description": "Handed to the carrier with a tracking number" },
+    { "id": "delivered", "label": "Delivered", "kind": "terminal", "description": "Confirmed by the carrier" },
+    { "id": "cancelled", "label": "Cancelled", "kind": "terminal", "description": "Withdrawn, refunded if anything had been taken" }
+  ],
+  "transitions": [
+    { "id": "submit", "from": "draft", "to": "placed", "event": "submit", "actor": "buyer", "guard": "the basket is not empty", "action": "authorise the card" },
+    { "id": "abandon", "from": "draft", "to": "cancelled", "event": "30 days idle", "actor": "system", "kind": "timeout", "action": "release the basket" },
+    { "id": "capture", "from": "placed", "to": "paid", "event": "payment captured", "actor": "payment provider", "action": "reserve stock" },
+    { "id": "decline", "from": "placed", "to": "payment_failed", "event": "payment declined", "actor": "payment provider", "kind": "failure", "action": "email the buyer" },
+    { "id": "retry", "from": "payment_failed", "to": "placed", "event": "try another card", "actor": "buyer", "guard": "fewer than three attempts" },
+    { "id": "give-up", "from": "payment_failed", "to": "cancelled", "event": "three attempts used", "actor": "system", "kind": "auto", "action": "release the stock hold" },
+    { "id": "dispatch", "from": "paid", "to": "shipped", "event": "dispatch", "actor": "ops", "action": "email the tracking number" },
+    { "id": "cancel", "from": "paid", "to": "cancelled", "event": "cancel", "actor": "buyer", "guard": "not yet dispatched", "action": "refund in full" },
+    { "id": "confirm", "from": "shipped", "to": "delivered", "event": "carrier confirms", "actor": "carrier", "action": "close the order" }
+  ],
+  "cards": [
+    { "title": "Where these came from", "tone": "info", "items": ["State ids are the order_status enum values in orders.erd.json", "Transitions are the guard clauses in OrderStateMachine"] }
+  ]
+}

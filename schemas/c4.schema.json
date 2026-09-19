@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "c4.schema.json",
+  "title": "vibeX C4",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "elements"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "c4" },
+    "meta": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/meta" }],
+      "properties": {
+        "level": { "enum": ["landscape", "context", "container", "component"], "description": "C4 level of this diagram. One diagram per level; link between them with element.link." },
+        "scope": { "type": "string", "description": "The system or container this diagram zooms into" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "direction": { "enum": ["tb", "lr"], "description": "Rank flow: top-to-bottom or left-to-right. Default: lr when there are more than 4 ranks." },
+        "gapX": { "type": "number", "minimum": 0, "default": 80 },
+        "gapY": { "type": "number", "minimum": 0, "default": 90 }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "label"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "kind": { "enum": ["person", "system", "container", "component", "database", "queue"] },
+          "label": { "type": "string" },
+          "technology": { "type": "string", "description": "e.g. NestJS / Node.js, PostgreSQL 15, React SPA" },
+          "description": { "type": "string", "description": "One sentence: what it does" },
+          "external": { "type": "boolean", "description": "Outside your ownership. Rendered grey." },
+          "row": { "type": "integer", "minimum": 0, "maximum": 1000, "description": "Optional manual placement. Auto layout ranks by relationship flow otherwise. No two elements may share a row/col." },
+          "col": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "link": { "type": "string", "pattern": "^(https?://|//|(?![a-zA-Z][a-zA-Z0-9+.-]*:))", "description": "Relative path to the next-level diagram HTML, for drill-down. Relative paths and http(s) URLs only; other schemes are rejected." },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "contains"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "kind": { "enum": ["enterprise", "system", "container", "deployment"], "default": "system" },
+          "label": { "type": "string" },
+          "contains": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/id" }, "description": "Element ids or nested boundary ids" }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "from": { "$ref": "common.schema.json#/$defs/id" },
+          "to": { "$ref": "common.schema.json#/$defs/id" },
+          "label": { "type": "string", "description": "Verb phrase: Reads from, Sends emails via" },
+          "technology": { "type": "string", "description": "HTTPS/JSON, gRPC, AMQP, SQL" },
+          "direction": { "enum": ["forward", "both"], "default": "forward" },
+          "style": { "enum": ["solid", "dashed"], "default": "solid", "description": "dashed = async" }
+        }
+      }
+    },
+    "cards": { "$ref": "common.schema.json#/$defs/cards" }
+  }
+}

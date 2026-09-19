@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "T<!-- VIBEX:LEGEND --><!-- VIBEX:CARDS --><!-- VIBEX:SPEC --><!-- VIBEX:SVG --><!-- VIBEX:VIEWER_JS --><!-- VIBEX:CSS --><!-- VIBEX:NAV --><!-- VIBEX:PANELS --><!-- VIBEX:OVERVIEW --><!-- VIBEX:SPECS --></svg><img src=x onerror=document.title='XSS1'>",
+    "subtitle": "</script><script>document.title='XSS2'</script>",
+    "description": "Plain text with <!-- comment marker and </script> inside",
+    "repository": { "url": "https://github.com/example/hostile", "revision": "main" }
+  },
+  "entities": [
+    { "id": "a", "name": "a\" onload=\"document.title='XSS3'", "description": "<!-- desc -->", "columns": [{ "name": "id", "pk": true, "type": "uuid" }, { "name": "note", "type": "text", "note": "</script>" }], "sources": [{ "path": "src/a b#1?.ts", "line": 3 }] },
+    { "id": "b", "name": "b", "columns": [{ "name": "id", "pk": true }, { "name": "a_id", "fk": "a.id" }] }
+  ],
+  "relationships": [{ "from": "b", "to": "a", "label": "<!-- VIBEX:SPEC --> owns", "from_column": "a_id", "to_column": "id" }],
+  "cards": [{ "title": "<script>document.title='XSS4'</script>", "tone": "info", "items": ["<!-- VIBEX:SPEC -->", "</script>"] }]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "diagram_type": "c4",
+  "meta": {
+    "title": "Shop platform — Containers",
+    "subtitle": "C4 level 2: containers inside the Shop system",
+    "level": "container",
+    "scope": "Shop"
+  },
+  "elements": [
+    { "id": "customer", "kind": "person", "label": "Customer", "description": "Browses products and places orders" },
+    { "id": "ops", "kind": "person", "label": "Ops staff", "description": "Manages catalogue and refunds" },
+    { "id": "spa", "kind": "container", "label": "Storefront", "technology": "React SPA", "description": "Product browsing, cart, checkout UI", "link": "storefront.c4.html" },
+    { "id": "admin", "kind": "container", "label": "Admin console", "technology": "Next.js", "description": "Back-office for catalogue and orders" },
+    { "id": "bff", "kind": "container", "label": "BFF", "technology": "NestJS / GraphQL", "description": "Aggregates domain APIs for the frontends, owns auth sessions", "link": "bff.c4.html" },
+    { "id": "order_api", "kind": "container", "label": "Order API", "technology": "NestJS / REST", "description": "Order lifecycle, pricing, payments orchestration" },
+    { "id": "catalog_api", "kind": "container", "label": "Catalogue API", "technology": "NestJS / REST", "description": "Products, stock, search index" },
+    { "id": "db", "kind": "database", "label": "Shop DB", "technology": "PostgreSQL 15", "description": "Orders, users, products" },
+    { "id": "events", "kind": "queue", "label": "Domain events", "technology": "AWS SQS", "description": "order.placed, order.paid, stock.changed" },
+    { "id": "worker", "kind": "container", "label": "Notification worker", "technology": "Node.js", "description": "Sends emails and webhooks from domain events" },
+    { "id": "stripe", "kind": "system", "label": "Stripe", "external": true, "description": "Card payments" },
+    { "id": "mail", "kind": "system", "label": "SendGrid", "external": true, "description": "Transactional email" }
+  ],
+  "boundaries": [
+    { "id": "shop", "kind": "system", "label": "Shop", "contains": ["spa", "admin", "bff", "backend"] },
+    { "id": "backend", "kind": "deployment", "label": "Private network", "contains": ["order_api", "catalog_api", "db", "events", "worker"] }
+  ],
+  "relationships": [
+    { "from": "customer", "to": "spa", "label": "Shops using", "technology": "HTTPS" },
+    { "from": "ops", "to": "admin", "label": "Manages via", "technology": "HTTPS" },
+    { "from": "spa", "to": "bff", "label": "Queries / mutations", "technology": "GraphQL over HTTPS" },
+    { "from": "admin", "to": "bff", "label": "Queries / mutations", "technology": "GraphQL over HTTPS" },
+    { "from": "bff", "to": "order_api", "label": "Places and reads orders", "technology": "REST/JSON" },
+    { "from": "bff", "to": "catalog_api", "label": "Reads products", "technology": "REST/JSON" },
+    { "from": "order_api", "to": "db", "label": "Reads / writes", "technology": "SQL" },
+    { "from": "catalog_api", "to": "db", "label": "Reads / writes", "technology": "SQL" },
+    { "from": "order_api", "to": "events", "label": "Publishes", "technology": "SQS", "style": "dashed" },
+    { "from": "events", "to": "worker", "label": "Consumes", "technology": "SQS", "style": "dashed" },
+    { "from": "order_api", "to": "stripe", "label": "Charges cards", "technology": "HTTPS" },
+    { "from": "worker", "to": "mail", "label": "Sends email", "technology": "HTTPS" }
+  ],
+  "cards": [
+    { "title": "Ownership", "tone": "info", "items": ["Frontends: web team", "BFF and APIs: platform team", "Stripe and SendGrid are external"] }
+  ]
+}

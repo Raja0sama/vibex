@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
+      - run: npm test
+      - run: node bin/vibex.mjs types
+      - run: node bin/vibex.mjs demo out
+
+  render-warnings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: examples must render without warnings
+        run: |
+          node bin/vibex.mjs demo out 2> stderr.txt
+          if grep -qi 'warning' stderr.txt; then cat stderr.txt; exit 1; fi
+
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: tarball must ship every runtime asset
+        run: |
+          npm pack --dry-run --json > pack.json
+          for f in bin/vibex.mjs assets/template.html assets/dashboard.html assets/viewer.js assets/viewer.css schemas/erd.schema.json examples/orders.erd.json SKILL.md LICENSE; do
+            grep -q "\"path\": *\"$f\"" pack.json || { echo "missing from tarball: $f"; exit 1; }
+          done

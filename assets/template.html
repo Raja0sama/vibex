@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-diagram-type="<!-- VIBEX:TYPE -->" data-theme-pref="<!-- VIBEX:THEME -->">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!-- VIBEX:TITLE --></title>
+<style>
+<!-- VIBEX:CSS -->
+body{display:flex;flex-direction:column;min-height:100vh}
+.viewer{flex:1}
+@media (max-width:900px){body{min-height:auto;height:auto}html{height:auto}.viewer{flex:none}}
+</style>
+</head>
+<body>
+<section class="viewer" data-role="viewer">
+  <header class="toolbar">
+    <div class="titles">
+      <h1><!-- VIBEX:TITLE --></h1>
+      <span class="type-badge <!-- VIBEX:TYPE -->"><!-- VIBEX:TYPE --></span>
+      <p class="sub"><!-- VIBEX:SUBTITLE --></p>
+    </div>
+    <!-- VIBEX:ACTIONS -->
+  </header>
+  <div class="viewer-body">
+    <div class="canvas" data-role="canvas">
+      <!-- VIBEX:SVG -->
+      <div class="hint">drag to pan · wheel to zoom · click a node · Esc clears</div>
+    </div>
+    <aside>
+      <section><h2>Details</h2><div class="details" data-role="details" aria-live="polite"><p class="empty">Click a node or relationship.</p></div></section>
+      <section><h2>Legend</h2><!-- VIBEX:LEGEND --></section>
+      <section><h2>Stats</h2><div class="stats" data-role="stats"></div></section>
+    </aside>
+  </div>
+  <div class="cards"><!-- VIBEX:CARDS --></div>
+</section>
+<script id="vibex-spec" type="application/json"><!-- VIBEX:SPEC --></script>
+<script>
+<!-- VIBEX:VIEWER_JS -->
+</script>
+<script>
+(function () {
+  var spec = JSON.parse(document.getElementById('vibex-spec').textContent);
+  var viewer = new VibexViewer(document.querySelector('[data-role=viewer]'), spec);
+  var m = /[#&]node=([^&]+)/.exec(location.hash);
+  if (m) { try { viewer.selectNode(decodeURIComponent(m[1])); } catch (e) { /* malformed hash */ } }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "erd.schema.json",
+  "title": "vibeX ERD",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "entities"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "erd" },
+    "meta": { "$ref": "common.schema.json#/$defs/meta" },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "cols": { "type": "integer", "minimum": 1, "description": "Grid columns for auto placement. Default ceil(sqrt(n))." },
+        "gapX": { "type": "number", "minimum": 0, "default": 90 },
+        "gapY": { "type": "number", "minimum": 0, "default": 70 }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "description": "Optional visual grouping (schema, bounded context, module). Drawn as a labeled frame behind member entities.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "entities"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "label": { "type": "string" },
+          "entities": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" }, "minItems": 1 }
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "type": "string", "description": "Table / model name as it appears in the DB or ORM" },
+          "kind": { "enum": ["table", "view", "enum", "embedded"], "default": "table" },
+          "schema": { "type": "string", "description": "DB schema, e.g. public" },
+          "description": { "type": "string" },
+          "row": { "type": "integer", "minimum": 0, "maximum": 1000, "description": "Optional manual grid placement. No two entities may share a row/col." },
+          "col": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string", "description": "uuid, varchar(255), int, jsonb, timestamptz, enum name..." },
+                "pk": { "type": "boolean" },
+                "fk": { "type": "string", "description": "Target as entityId.column, e.g. user.id" },
+                "nullable": { "type": "boolean" },
+                "unique": { "type": "boolean" },
+                "indexed": { "type": "boolean" },
+                "default": { "type": "string" },
+                "note": { "type": "string" }
+              }
+            }
+          },
+          "values": { "type": "array", "items": { "type": "string" }, "description": "Enum values when kind is enum" },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "from": { "$ref": "common.schema.json#/$defs/id", "description": "Entity id on the FK side (child)" },
+          "to": { "$ref": "common.schema.json#/$defs/id", "description": "Entity id on the referenced side (parent)" },
+          "from_cardinality": { "enum": ["one", "zero-or-one", "many", "one-or-many"], "default": "many" },
+          "to_cardinality": { "enum": ["one", "zero-or-one", "many", "one-or-many"], "default": "one" },
+          "from_column": { "type": "string" },
+          "to_column": { "type": "string" },
+          "label": { "type": "string", "description": "Verb phrase, e.g. places, belongs to" },
+          "identifying": { "type": "boolean", "description": "true = solid line (FK is part of child PK); false = dashed" },
+          "on_delete": { "enum": ["cascade", "restrict", "set-null", "no-action"] }
+        }
+      }
+    },
+    "cards": { "$ref": "common.schema.json#/$defs/cards" }
+  }
+}
