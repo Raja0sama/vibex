@@ -3,14 +3,11 @@
   "diagram_type": "erd",
   "meta": {
     "title": "Orders domain",
-    "subtitle": "Core tables behind checkout and fulfilment",
+    "subtitle": "Identity, catalogue, commerce, payments and fulfilment",
     "repository": {
       "url": "https://github.com/example/shop-api",
       "revision": "main"
     }
-  },
-  "layout": {
-    "cols": 3
   },
   "groups": [
     {
@@ -18,18 +15,55 @@
       "label": "Identity",
       "entities": [
         "user",
-        "address"
+        "address",
+        "session",
+        "api_key"
+      ]
+    },
+    {
+      "id": "catalogue",
+      "label": "Catalogue",
+      "entities": [
+        "product",
+        "product_variant",
+        "category",
+        "product_category",
+        "inventory",
+        "product_status"
       ]
     },
     {
       "id": "commerce",
       "label": "Commerce",
       "entities": [
+        "cart",
+        "cart_item",
         "order",
         "order_item",
-        "product",
-        "payment",
+        "discount",
+        "order_discount",
         "order_status"
+      ]
+    },
+    {
+      "id": "payments",
+      "label": "Payments",
+      "entities": [
+        "payment_method",
+        "payment",
+        "refund",
+        "invoice",
+        "payment_status"
+      ]
+    },
+    {
+      "id": "fulfilment",
+      "label": "Fulfilment",
+      "entities": [
+        "carrier",
+        "shipment",
+        "shipment_item",
+        "tracking_event"
       ]
     }
   ],
@@ -37,8 +71,6 @@
     {
       "id": "user",
       "name": "users",
-      "schema": "public",
-      "description": "Registered customers",
       "columns": [
         {
           "name": "id",
@@ -51,20 +83,29 @@
           "unique": true
         },
         {
-          "name": "full_name",
+          "name": "display_name",
           "type": "text"
         },
         {
+          "name": "password_hash",
+          "type": "text",
+          "nullable": true,
+          "note": "null for SSO-only accounts"
+        },
+        {
           "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "deleted_at",
           "type": "timestamptz",
-          "default": "now()"
+          "nullable": true
         }
       ],
       "sources": [
         {
-          "path": "prisma/schema.prisma",
-          "line": 12,
-          "label": "model User"
+          "path": "src/identity/user.entity.ts",
+          "line": 14
         }
       ]
     },
@@ -80,10 +121,24 @@
         {
           "name": "user_id",
           "type": "uuid",
-          "fk": "user.id"
+          "fk": "user.id",
+          "indexed": true
         },
         {
           "name": "line1",
+          "type": "text"
+        },
+        {
+          "name": "line2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "city",
+          "type": "text"
+        },
+        {
+          "name": "postcode",
           "type": "text"
         },
         {
@@ -98,9 +153,44 @@
       ]
     },
     {
-      "id": "order",
-      "name": "orders",
-      "description": "One checkout. Immutable after payment.",
+      "id": "session",
+      "name": "sessions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id",
+          "indexed": true
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "ip",
+          "type": "inet",
+          "nullable": true
+        },
+        {
+          "name": "user_agent",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "api_key",
+      "name": "api_keys",
       "columns": [
         {
           "name": "id",
@@ -113,48 +203,31 @@
           "fk": "user.id"
         },
         {
-          "name": "shipping_address_id",
-          "type": "uuid",
-          "fk": "address.id",
+          "name": "label",
+          "type": "text"
+        },
+        {
+          "name": "prefix",
+          "type": "char(8)",
+          "unique": true
+        },
+        {
+          "name": "secret_hash",
+          "type": "text"
+        },
+        {
+          "name": "scopes",
+          "type": "text[]"
+        },
+        {
+          "name": "last_used_at",
+          "type": "timestamptz",
           "nullable": true
         },
         {
-          "name": "status",
-          "type": "order_status"
-        },
-        {
-          "name": "total_cents",
-          "type": "int"
-        },
-        {
-          "name": "placed_at",
-          "type": "timestamptz"
-        }
-      ]
-    },
-    {
-      "id": "order_item",
-      "name": "order_items",
-      "columns": [
-        {
-          "name": "order_id",
-          "type": "uuid",
-          "pk": true,
-          "fk": "order.id"
-        },
-        {
-          "name": "product_id",
-          "type": "uuid",
-          "pk": true,
-          "fk": "product.id"
-        },
-        {
-          "name": "quantity",
-          "type": "int"
-        },
-        {
-          "name": "unit_price_cents",
-          "type": "int"
+          "name": "revoked_at",
+          "type": "timestamptz",
+          "nullable": true
         }
       ]
     },
@@ -173,17 +246,504 @@
           "unique": true
         },
         {
-          "name": "name",
+          "name": "title",
+          "type": "text"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "product_status"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ],
+      "sources": [
+        {
+          "path": "src/catalogue/product.entity.ts",
+          "line": 22
+        }
+      ]
+    },
+    {
+      "id": "product_variant",
+      "name": "product_variants",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "product_id",
+          "type": "uuid",
+          "fk": "product.id",
+          "indexed": true
+        },
+        {
+          "name": "sku",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "option_name",
+          "type": "text"
+        },
+        {
+          "name": "option_value",
           "type": "text"
         },
         {
           "name": "price_cents",
-          "type": "int"
+          "type": "integer"
         },
         {
-          "name": "attributes",
-          "type": "jsonb",
+          "name": "weight_grams",
+          "type": "integer",
           "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "category",
+      "name": "categories",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "parent_id",
+          "type": "uuid",
+          "fk": "category.id",
+          "nullable": true,
+          "note": "self-referencing tree"
+        }
+      ]
+    },
+    {
+      "id": "product_category",
+      "name": "product_categories",
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "uuid",
+          "fk": "product.id",
+          "pk": true
+        },
+        {
+          "name": "category_id",
+          "type": "uuid",
+          "fk": "category.id",
+          "pk": true
+        },
+        {
+          "name": "position",
+          "type": "smallint",
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "inventory",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "variant_id",
+          "type": "uuid",
+          "fk": "product_variant.id",
+          "unique": true
+        },
+        {
+          "name": "on_hand",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "reserved",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "reorder_at",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "id": "cart",
+      "name": "carts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id",
+          "nullable": true,
+          "note": "null while anonymous"
+        },
+        {
+          "name": "session_token",
+          "type": "text",
+          "nullable": true,
+          "indexed": true
+        },
+        {
+          "name": "currency",
+          "type": "char(3)"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "abandoned_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "cart_item",
+      "name": "cart_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "cart_id",
+          "type": "uuid",
+          "fk": "cart.id",
+          "indexed": true
+        },
+        {
+          "name": "variant_id",
+          "type": "uuid",
+          "fk": "product_variant.id"
+        },
+        {
+          "name": "quantity",
+          "type": "integer"
+        },
+        {
+          "name": "unit_price_cents",
+          "type": "integer",
+          "note": "snapshot at add time"
+        }
+      ]
+    },
+    {
+      "id": "order",
+      "name": "orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id",
+          "indexed": true
+        },
+        {
+          "name": "billing_address_id",
+          "type": "uuid",
+          "fk": "address.id"
+        },
+        {
+          "name": "shipping_address_id",
+          "type": "uuid",
+          "fk": "address.id"
+        },
+        {
+          "name": "status",
+          "type": "order_status",
+          "indexed": true
+        },
+        {
+          "name": "currency",
+          "type": "char(3)"
+        },
+        {
+          "name": "subtotal_cents",
+          "type": "integer"
+        },
+        {
+          "name": "discount_cents",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "tax_cents",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "shipping_cents",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "total_cents",
+          "type": "integer"
+        },
+        {
+          "name": "refunded_cents",
+          "type": "integer",
+          "default": "0"
+        },
+        {
+          "name": "placed_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "shipped_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "delivered_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "cancelled_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "customer_note",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "internal_note",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "ip",
+          "type": "inet",
+          "nullable": true
+        },
+        {
+          "name": "user_agent",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "referrer",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "risk_score",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "locale",
+          "type": "text",
+          "default": "'en-GB'"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        }
+      ],
+      "description": "One row per placed order. Wide on purpose: money, lifecycle timestamps and request provenance all live here.",
+      "sources": [
+        {
+          "path": "src/orders/order.entity.ts",
+          "line": 31
+        }
+      ]
+    },
+    {
+      "id": "order_item",
+      "name": "order_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "fk": "order.id",
+          "indexed": true
+        },
+        {
+          "name": "variant_id",
+          "type": "uuid",
+          "fk": "product_variant.id"
+        },
+        {
+          "name": "title_snapshot",
+          "type": "text"
+        },
+        {
+          "name": "quantity",
+          "type": "integer"
+        },
+        {
+          "name": "unit_price_cents",
+          "type": "integer"
+        },
+        {
+          "name": "tax_cents",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "discount",
+      "name": "discounts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "value",
+          "type": "integer"
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "max_redemptions",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "order_discount",
+      "name": "order_discounts",
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "fk": "order.id",
+          "pk": true
+        },
+        {
+          "name": "discount_id",
+          "type": "uuid",
+          "fk": "discount.id",
+          "pk": true
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "payment_method",
+      "name": "payment_methods",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "fk": "user.id"
+        },
+        {
+          "name": "brand",
+          "type": "text"
+        },
+        {
+          "name": "last4",
+          "type": "char(4)"
+        },
+        {
+          "name": "exp_month",
+          "type": "smallint"
+        },
+        {
+          "name": "exp_year",
+          "type": "smallint"
+        },
+        {
+          "name": "provider_token",
+          "type": "text",
+          "note": "opaque; never the PAN"
         }
       ]
     },
@@ -200,7 +760,21 @@
           "name": "order_id",
           "type": "uuid",
           "fk": "order.id",
-          "unique": true
+          "indexed": true
+        },
+        {
+          "name": "method_id",
+          "type": "uuid",
+          "fk": "payment_method.id",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "payment_status"
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer"
         },
         {
           "name": "provider",
@@ -209,11 +783,206 @@
         {
           "name": "provider_ref",
           "type": "text",
-          "nullable": true
+          "unique": true
         },
         {
           "name": "captured_at",
           "type": "timestamptz",
+          "nullable": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "src/payments/payment.entity.ts",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "refund",
+      "name": "refunds",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "fk": "payment.id",
+          "indexed": true
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "provider_ref",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "id": "invoice",
+      "name": "invoices",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "fk": "order.id",
+          "unique": true
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "issued_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "due_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "pdf_url",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "carrier",
+      "name": "carriers",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "unique": true
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "tracking_url_template",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "shipment",
+      "name": "shipments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "fk": "order.id",
+          "indexed": true
+        },
+        {
+          "name": "carrier_id",
+          "type": "uuid",
+          "fk": "carrier.id"
+        },
+        {
+          "name": "tracking_number",
+          "type": "text",
+          "nullable": true,
+          "indexed": true
+        },
+        {
+          "name": "dispatched_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "delivered_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "shipment_item",
+      "name": "shipment_items",
+      "columns": [
+        {
+          "name": "shipment_id",
+          "type": "uuid",
+          "fk": "shipment.id",
+          "pk": true
+        },
+        {
+          "name": "order_item_id",
+          "type": "uuid",
+          "fk": "order_item.id",
+          "pk": true
+        },
+        {
+          "name": "quantity",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "tracking_event",
+      "name": "tracking_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pk": true
+        },
+        {
+          "name": "shipment_id",
+          "type": "uuid",
+          "fk": "shipment.id",
+          "indexed": true
+        },
+        {
+          "name": "code",
+          "type": "text"
+        },
+        {
+          "name": "description",
+          "type": "text"
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "location",
+          "type": "text",
           "nullable": true
         }
       ]
@@ -221,21 +990,47 @@
     {
       "id": "order_status",
       "name": "order_status",
+      "columns": [],
+      "kind": "enum",
+      "values": [
+        "pending",
+        "confirmed",
+        "paid",
+        "packing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refunded"
+      ]
+    },
+    {
+      "id": "payment_status",
+      "name": "payment_status",
+      "columns": [],
+      "kind": "enum",
+      "values": [
+        "authorised",
+        "captured",
+        "failed",
+        "refunded",
+        "partially_refunded"
+      ]
+    },
+    {
+      "id": "product_status",
+      "name": "product_status",
+      "columns": [],
       "kind": "enum",
       "values": [
         "draft",
-        "placed",
-        "payment_failed",
-        "paid",
-        "shipped",
-        "delivered",
-        "cancelled"
+        "active",
+        "archived"
       ]
     }
   ],
   "relationships": [
     {
-      "id": "address-user",
+      "id": "address-user-user_id",
       "from": "address",
       "to": "user",
       "from_column": "user_id",
@@ -244,46 +1039,260 @@
       "on_delete": "cascade"
     },
     {
-      "id": "order-user",
+      "id": "session-user-user_id",
+      "from": "session",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "authenticates",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "api_key-user-user_id",
+      "from": "api_key",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "issued to",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "product_variant-product-product_id",
+      "from": "product_variant",
+      "to": "product",
+      "from_column": "product_id",
+      "to_column": "id",
+      "label": "varies",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "category-category-parent_id",
+      "from": "category",
+      "to": "category",
+      "from_column": "parent_id",
+      "to_column": "id",
+      "label": "nests under",
+      "to_cardinality": "zero-or-one",
+      "on_delete": "set-null"
+    },
+    {
+      "id": "product_category-product-product_id",
+      "from": "product_category",
+      "to": "product",
+      "from_column": "product_id",
+      "to_column": "id",
+      "label": "tags",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "product_category-category-category_id",
+      "from": "product_category",
+      "to": "category",
+      "from_column": "category_id",
+      "to_column": "id",
+      "label": "tagged as",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "inventory-product_variant-variant_id",
+      "from": "inventory",
+      "to": "product_variant",
+      "from_column": "variant_id",
+      "to_column": "id",
+      "label": "stocks",
+      "from_cardinality": "one",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "cart-user-user_id",
+      "from": "cart",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "held by",
+      "to_cardinality": "zero-or-one",
+      "on_delete": "set-null"
+    },
+    {
+      "id": "cart_item-cart-cart_id",
+      "from": "cart_item",
+      "to": "cart",
+      "from_column": "cart_id",
+      "to_column": "id",
+      "label": "sits in",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "cart_item-product_variant-variant_id",
+      "from": "cart_item",
+      "to": "product_variant",
+      "from_column": "variant_id",
+      "to_column": "id",
+      "label": "refers to",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "order-user-user_id",
       "from": "order",
       "to": "user",
       "from_column": "user_id",
       "to_column": "id",
-      "label": "placed by"
+      "label": "placed by",
+      "on_delete": "restrict"
     },
     {
-      "id": "order-address",
+      "id": "order-address-billing_address_id",
+      "from": "order",
+      "to": "address",
+      "from_column": "billing_address_id",
+      "to_column": "id",
+      "label": "billed to",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "order-address-shipping_address_id",
       "from": "order",
       "to": "address",
       "from_column": "shipping_address_id",
       "to_column": "id",
-      "to_cardinality": "zero-or-one",
-      "label": "ships to",
-      "identifying": false
+      "label": "shipped to",
+      "on_delete": "restrict"
     },
     {
-      "id": "item-order",
+      "id": "order_item-order-order_id",
       "from": "order_item",
       "to": "order",
-      "from_cardinality": "one-or-many",
-      "from_column": "order_id",
-      "to_column": "id"
-    },
-    {
-      "id": "item-product",
-      "from": "order_item",
-      "to": "product",
-      "from_column": "product_id",
-      "to_column": "id"
-    },
-    {
-      "id": "payment-order",
-      "from": "payment",
-      "to": "order",
-      "from_cardinality": "zero-or-one",
       "from_column": "order_id",
       "to_column": "id",
-      "label": "pays"
+      "label": "line of",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "order_item-product_variant-variant_id",
+      "from": "order_item",
+      "to": "product_variant",
+      "from_column": "variant_id",
+      "to_column": "id",
+      "label": "refers to",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "order_discount-order-order_id",
+      "from": "order_discount",
+      "to": "order",
+      "from_column": "order_id",
+      "to_column": "id",
+      "label": "applied to",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "order_discount-discount-discount_id",
+      "from": "order_discount",
+      "to": "discount",
+      "from_column": "discount_id",
+      "to_column": "id",
+      "label": "redeems",
+      "identifying": true,
+      "on_delete": "restrict"
+    },
+    {
+      "id": "payment_method-user-user_id",
+      "from": "payment_method",
+      "to": "user",
+      "from_column": "user_id",
+      "to_column": "id",
+      "label": "saved by",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "payment-order-order_id",
+      "from": "payment",
+      "to": "order",
+      "from_column": "order_id",
+      "to_column": "id",
+      "label": "settles",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "payment-payment_method-method_id",
+      "from": "payment",
+      "to": "payment_method",
+      "from_column": "method_id",
+      "to_column": "id",
+      "label": "charged to",
+      "to_cardinality": "zero-or-one",
+      "on_delete": "set-null"
+    },
+    {
+      "id": "refund-payment-payment_id",
+      "from": "refund",
+      "to": "payment",
+      "from_column": "payment_id",
+      "to_column": "id",
+      "label": "reverses",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "invoice-order-order_id",
+      "from": "invoice",
+      "to": "order",
+      "from_column": "order_id",
+      "to_column": "id",
+      "label": "bills",
+      "from_cardinality": "zero-or-one",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "shipment-order-order_id",
+      "from": "shipment",
+      "to": "order",
+      "from_column": "order_id",
+      "to_column": "id",
+      "label": "fulfils",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "shipment-carrier-carrier_id",
+      "from": "shipment",
+      "to": "carrier",
+      "from_column": "carrier_id",
+      "to_column": "id",
+      "label": "carried by",
+      "on_delete": "restrict"
+    },
+    {
+      "id": "shipment_item-shipment-shipment_id",
+      "from": "shipment_item",
+      "to": "shipment",
+      "from_column": "shipment_id",
+      "to_column": "id",
+      "label": "packed in",
+      "identifying": true,
+      "on_delete": "cascade"
+    },
+    {
+      "id": "shipment_item-order_item-order_item_id",
+      "from": "shipment_item",
+      "to": "order_item",
+      "from_column": "order_item_id",
+      "to_column": "id",
+      "label": "ships",
+      "identifying": true,
+      "on_delete": "restrict"
+    },
+    {
+      "id": "tracking_event-shipment-shipment_id",
+      "from": "tracking_event",
+      "to": "shipment",
+      "from_column": "shipment_id",
+      "to_column": "id",
+      "label": "tracks",
+      "on_delete": "cascade"
     }
   ],
   "cards": [
@@ -292,16 +1301,18 @@
       "tone": "info",
       "items": [
         "All ids are uuid v7",
-        "Money is integer cents",
-        "Timestamps are timestamptz in UTC"
+        "Money is integer cents, never float",
+        "Timestamps are timestamptz in UTC",
+        "Snapshot columns (`*_snapshot`, `unit_price_cents`) freeze a value at write time"
       ]
     },
     {
       "title": "Watch out",
       "tone": "warning",
       "items": [
-        "order_items has a composite PK",
-        "payments.order_id is unique: one payment per order"
+        "`orders` is wide on purpose — money, lifecycle and provenance in one row",
+        "`categories.parent_id` is self-referencing; guard against cycles in application code",
+        "`product_categories`, `order_discounts` and `shipment_items` are composite-key join tables"
       ]
     }
   ]
