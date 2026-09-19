@@ -1,0 +1,319 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "Billing data model",
+    "subtitle": "Imported straight from schema.prisma \u2014 five models and an enum, on their own database",
+    "id": "billing.erd",
+    "repository": {
+      "url": "https://github.com/example/relay",
+      "revision": "main"
+    }
+  },
+  "entities": [
+    {
+      "id": "account",
+      "name": "accounts",
+      "kind": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String",
+          "pk": true,
+          "default": "uuid("
+        },
+        {
+          "name": "merchantId",
+          "type": "String",
+          "unique": true,
+          "note": "column merchant_id"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "currency",
+          "type": "String"
+        },
+        {
+          "name": "termsDays",
+          "type": "Int",
+          "default": "30",
+          "note": "column terms_days"
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "default": "now(",
+          "note": "column created_at"
+        }
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 15,
+          "label": "model Account"
+        }
+      ]
+    },
+    {
+      "id": "invoice",
+      "name": "invoices",
+      "kind": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String",
+          "pk": true,
+          "default": "uuid("
+        },
+        {
+          "name": "accountId",
+          "type": "String",
+          "note": "column account_id",
+          "fk": "account.id"
+        },
+        {
+          "name": "number",
+          "type": "String",
+          "unique": true
+        },
+        {
+          "name": "status",
+          "type": "InvoiceStatus",
+          "default": "draft"
+        },
+        {
+          "name": "issuedAt",
+          "type": "DateTime",
+          "nullable": true,
+          "note": "column issued_at"
+        },
+        {
+          "name": "dueAt",
+          "type": "DateTime",
+          "nullable": true,
+          "note": "column due_at"
+        },
+        {
+          "name": "totalMinor",
+          "type": "Int",
+          "note": "column total_minor"
+        }
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 28,
+          "label": "model Invoice"
+        }
+      ]
+    },
+    {
+      "id": "invoiceline",
+      "name": "invoice_lines",
+      "kind": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String",
+          "pk": true,
+          "default": "uuid("
+        },
+        {
+          "name": "invoiceId",
+          "type": "String",
+          "note": "column invoice_id",
+          "fk": "invoice.id"
+        },
+        {
+          "name": "parcelId",
+          "type": "String",
+          "note": "column parcel_id"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "note": "column amount_minor"
+        },
+        {
+          "name": "surcharge",
+          "type": "Boolean",
+          "default": "false"
+        }
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 43,
+          "label": "model InvoiceLine"
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "name": "payments",
+      "kind": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String",
+          "pk": true,
+          "default": "uuid("
+        },
+        {
+          "name": "invoiceId",
+          "type": "String",
+          "note": "column invoice_id",
+          "fk": "invoice.id"
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "unique": true
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "note": "column amount_minor"
+        },
+        {
+          "name": "receivedAt",
+          "type": "DateTime",
+          "note": "column received_at"
+        }
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 55,
+          "label": "model Payment"
+        }
+      ]
+    },
+    {
+      "id": "ratecard",
+      "name": "rate_cards",
+      "kind": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "String",
+          "pk": true,
+          "default": "uuid("
+        },
+        {
+          "name": "accountId",
+          "type": "String",
+          "note": "column account_id",
+          "fk": "account.id"
+        },
+        {
+          "name": "service",
+          "type": "String"
+        },
+        {
+          "name": "perKgMinor",
+          "type": "Int",
+          "note": "column per_kg_minor"
+        },
+        {
+          "name": "validFrom",
+          "type": "DateTime",
+          "note": "column valid_from"
+        },
+        {
+          "name": "validTo",
+          "type": "DateTime",
+          "nullable": true,
+          "note": "column valid_to"
+        }
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 66,
+          "label": "model RateCard"
+        }
+      ]
+    },
+    {
+      "id": "invoicestatus",
+      "name": "InvoiceStatus",
+      "kind": "enum",
+      "values": [
+        "draft",
+        "issued",
+        "part_paid",
+        "paid",
+        "overdue",
+        "written_off"
+      ],
+      "sources": [
+        {
+          "path": "showcase/prisma/schema.prisma",
+          "line": 78,
+          "label": "enum InvoiceStatus"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "invoice-account",
+      "from": "invoice",
+      "to": "account",
+      "from_cardinality": "many",
+      "to_cardinality": "one",
+      "from_column": "accountId",
+      "to_column": "id",
+      "label": "account"
+    },
+    {
+      "id": "invoiceline-invoice",
+      "from": "invoiceline",
+      "to": "invoice",
+      "from_cardinality": "many",
+      "to_cardinality": "one",
+      "from_column": "invoiceId",
+      "to_column": "id",
+      "label": "invoice",
+      "on_delete": "cascade"
+    },
+    {
+      "id": "payment-invoice",
+      "from": "payment",
+      "to": "invoice",
+      "from_cardinality": "many",
+      "to_cardinality": "one",
+      "from_column": "invoiceId",
+      "to_column": "id",
+      "label": "invoice"
+    },
+    {
+      "id": "ratecard-account",
+      "from": "ratecard",
+      "to": "account",
+      "from_cardinality": "many",
+      "to_cardinality": "one",
+      "from_column": "accountId",
+      "to_column": "id",
+      "label": "account"
+    }
+  ],
+  "cards": [
+    {
+      "title": "Source",
+      "tone": "info",
+      "items": [
+        "Imported from showcase/prisma/schema.prisma",
+        "Cardinality: FK side = many unless the FK column is @unique"
+      ]
+    }
+  ]
+}

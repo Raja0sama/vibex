@@ -145,7 +145,18 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     if (spec.diagram_type === 'docs') { docsSpecs.push({ spec, file }); return; }
     entries.push({ spec, file, index: entries.length });
   });
-  entries.sort((a, b) => TYPE_ORDER.indexOf(a.spec.diagram_type) - TYPE_ORDER.indexOf(b.spec.diagram_type));
+  const LEVEL_ORDER = ['landscape', 'context', 'container', 'component'];
+  entries.sort((a, b) => {
+    const byType = TYPE_ORDER.indexOf(a.spec.diagram_type) - TYPE_ORDER.indexOf(b.spec.diagram_type);
+    if (byType) return byType;
+    // Within C4, zoom order beats the alphabet: a reader starts at the widest
+    // view and drills in, and "Inside Dispatch" first is backwards.
+    if (a.spec.diagram_type === 'c4') {
+      const byLevel = LEVEL_ORDER.indexOf(a.spec.meta?.level ?? 'container') - LEVEL_ORDER.indexOf(b.spec.meta?.level ?? 'container');
+      if (byLevel) return byLevel;
+    }
+    return String(a.spec.meta?.title || a.file).localeCompare(String(b.spec.meta?.title || b.file));
+  });
   entries.forEach((e, i) => { e.index = i; });
   const warnings = [];
   let nav = '';

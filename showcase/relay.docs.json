@@ -11,10 +11,15 @@
     }
   },
   "covers": [
+    "relay-context.c4",
     "relay.c4",
+    "dispatch.c4",
     "relay.erd",
+    "billing.erd",
     "relay.endpoints",
-    "parcel.lifecycle"
+    "portal.endpoints",
+    "parcel.lifecycle",
+    "invoice.lifecycle"
   ],
   "review_window_days": 180,
   "sections": [
@@ -39,7 +44,7 @@
       "id": "movement",
       "title": "What actually moves a parcel",
       "summary": "The one rule that makes the status field mean something.",
-      "narrative": "**Only a scan moves a parcel forward.** There is no manual status edit anywhere in Relay [[state.no-manual-edit]], and the transition table is enforced in code rather than by convention [[state.table-enforced]].\n\nThis is not fussiness. A status that a human could set by hand would not be evidence that a parcel was physically anywhere, and every downstream promise — the delivery window, the merchant's invoice, the insurance claim — is built on it being exactly that.\n\nThe cost is that a parcel with a broken barcode is genuinely stuck until someone scans it, and support cannot type their way out. That trade is deliberate.\n\n> Two attempts, then the parcel stops moving until a person chooses [[policy.two-attempts]]. Van time is the scarce resource here, not shelf space at a depot, so a third speculative attempt costs more than waiting.",
+      "narrative": "**Only a scan moves a parcel forward.** There is no manual status edit anywhere in Relay [[state.no-manual-edit]], and the transition table is enforced in code rather than by convention [[state.table-enforced]].\n\nThis is not fussiness. A status that a human could set by hand would not be evidence that a parcel was physically anywhere, and every downstream promise \u2014 the delivery window, the merchant's invoice, the insurance claim \u2014 is built on it being exactly that.\n\nThe cost is that a parcel with a broken barcode is genuinely stuck until someone scans it, and support cannot type their way out. That trade is deliberate.\n\n> Two attempts, then the parcel stops moving until a person chooses [[policy.two-attempts]]. Van time is the scarce resource here, not shelf space at a depot, so a third speculative attempt costs more than waiting.",
       "claims": [
         "state.no-manual-edit",
         "state.table-enforced",
@@ -54,7 +59,7 @@
       "id": "lateness",
       "title": "Scans arrive late and out of order",
       "summary": "The assumption that shapes ingest, and the bug it prevents.",
-      "narrative": "A handheld in a depot basement holds its scans and uploads when it finds signal. So a batch can contain scans older than ones already recorded, and the same batch can arrive twice when an upload times out on a bad connection.\n\nBoth are handled at the ingest boundary. Every scan carries a key that is stable across retries, and a unique index is what enforces exactly-once — a duplicate loses the race and is discarded [[scans.idempotent]]. A scan describing a step the parcel has already passed is still recorded, because the history has to be complete, but it does not move the status backwards [[state.no-backwards]].\n\nThe practical consequence for anyone reading this data: `scanned_at` is device time and can be wrong [[scans.device-clock]], while `received_at` is set by the server and cannot be [[scans.server-clock]]. Order a tracking history by the first and reason about lateness with the second.",
+      "narrative": "A handheld in a depot basement holds its scans and uploads when it finds signal. So a batch can contain scans older than ones already recorded, and the same batch can arrive twice when an upload times out on a bad connection.\n\nBoth are handled at the ingest boundary. Every scan carries a key that is stable across retries, and a unique index is what enforces exactly-once \u2014 a duplicate loses the race and is discarded [[scans.idempotent]]. A scan describing a step the parcel has already passed is still recorded, because the history has to be complete, but it does not move the status backwards [[state.no-backwards]].\n\nThe practical consequence for anyone reading this data: `scanned_at` is device time and can be wrong [[scans.device-clock]], while `received_at` is set by the server and cannot be [[scans.server-clock]]. Order a tracking history by the first and reason about lateness with the second.",
       "claims": [
         "scans.idempotent",
         "state.no-backwards",
@@ -315,6 +320,10 @@
       {
         "area": "How handhelds are provisioned",
         "reason": "Client certificates are issued and rotated by field systems. Nothing here covers enrolment, revocation, or what happens to a stolen device."
+      },
+      {
+        "area": "Billing internals",
+        "reason": "The billing data model is drawn here, imported straight from its Prisma schema, but no claim explains how a rate card becomes an invoice line. That lives with the finance platform."
       }
     ]
   }

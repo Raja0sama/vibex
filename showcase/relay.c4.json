@@ -4,7 +4,7 @@
   "meta": {
     "id": "relay.c4",
     "title": "Relay \u2014 parcel network",
-    "subtitle": "C4 level 2: the containers that move a parcel from a merchant to a doorstep",
+    "subtitle": "C4 level 2: the containers inside Relay. Open Dispatch to go a level deeper.",
     "level": "container",
     "scope": "Relay",
     "repository": {
@@ -36,7 +36,8 @@
       "kind": "container",
       "label": "Merchant portal",
       "technology": "Next.js",
-      "description": "Booking, labels, invoices and shipment history"
+      "description": "Booking, labels, invoices and shipment history",
+      "link": "portal.endpoints.html"
     },
     {
       "id": "tracking_web",
@@ -72,7 +73,8 @@
       "kind": "container",
       "label": "Dispatch",
       "technology": "Java / Spring",
-      "description": "Owns parcel state and decides which route a parcel joins"
+      "description": "Owns parcel state and decides which route a parcel joins",
+      "link": "dispatch.c4.html"
     },
     {
       "id": "routing",

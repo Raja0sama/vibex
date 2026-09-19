@@ -32,6 +32,8 @@ function listOf(args, key) {
   return m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : null;
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 export function importPrisma(src, { title, sourcePath } = {}) {
   const blocks = parseBlocks(src);
   const models = blocks.filter((b) => b.kind === 'model' || b.kind === 'type');
@@ -134,7 +136,10 @@ export function importPrisma(src, { title, sourcePath } = {}) {
   return {
     schema_version: 1,
     diagram_type: 'erd',
-    meta: { title: title || 'Prisma schema', subtitle: `${models.length} models, ${enums.length} enums` },
+    meta: {
+      title: title || 'Prisma schema',
+      subtitle: [plural(models.length, 'model'), enums.length ? plural(enums.length, 'enum') : ''].filter(Boolean).join(', '),
+    },
     entities,
     relationships,
     ...(sourcePath ? { cards: [{ title: 'Source', tone: 'info', items: [`Imported from ${sourcePath}`, 'Cardinality: FK side = many unless the FK column is @unique'] }] } : {}),

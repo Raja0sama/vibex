@@ -1,0 +1,637 @@
+{
+  "schema_version": 1,
+  "diagram_type": "endpoints",
+  "meta": {
+    "title": "Merchant portal API",
+    "api_kind": "graphql",
+    "subtitle": "GraphQL, because a merchant dashboard wants a shipment, its parcels and their scans in one round trip",
+    "id": "portal.endpoints",
+    "repository": {
+      "url": "https://github.com/example/relay",
+      "revision": "main"
+    }
+  },
+  "groups": [
+    {
+      "id": "queries",
+      "label": "Queries"
+    },
+    {
+      "id": "mutations",
+      "label": "Mutations"
+    },
+    {
+      "id": "subscriptions",
+      "label": "Subscriptions"
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "query-shipment",
+      "group": "queries",
+      "method": "QUERY",
+      "path": "shipment(id: ID!)",
+      "summary": "One shipment with its parcels and their current state",
+      "response": "Shipment",
+      "params": [
+        {
+          "name": "id",
+          "in": "arg",
+          "type": "ID!",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "query-shipments",
+      "group": "queries",
+      "method": "QUERY",
+      "path": "shipments(status: ParcelStatus, bookedSince: DateTime, first: Int, after: String)",
+      "summary": "The calling merchant's shipments, newest first",
+      "response": "ShipmentConnection!",
+      "params": [
+        {
+          "name": "status",
+          "in": "arg",
+          "type": "ParcelStatus"
+        },
+        {
+          "name": "bookedSince",
+          "in": "arg",
+          "type": "DateTime"
+        },
+        {
+          "name": "first",
+          "in": "arg",
+          "type": "Int"
+        },
+        {
+          "name": "after",
+          "in": "arg",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "id": "query-parcel",
+      "group": "queries",
+      "method": "QUERY",
+      "path": "parcel(trackingNumber: String!)",
+      "summary": "Everything known about one parcel, by its tracking number",
+      "response": "Parcel",
+      "params": [
+        {
+          "name": "trackingNumber",
+          "in": "arg",
+          "type": "String!",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "query-depots",
+      "group": "queries",
+      "method": "QUERY",
+      "path": "depots",
+      "summary": "Depots and the postcodes they serve",
+      "response": "[Depot!]!"
+    },
+    {
+      "id": "mutation-bookShipment",
+      "group": "mutations",
+      "method": "MUTATION",
+      "path": "bookShipment(input: BookShipmentInput!)",
+      "summary": "Book a shipment and mint a tracking number per parcel",
+      "response": "BookShipmentPayload!",
+      "params": [
+        {
+          "name": "input",
+          "in": "arg",
+          "type": "BookShipmentInput!",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "mutation-cancelShipment",
+      "group": "mutations",
+      "method": "MUTATION",
+      "path": "cancelShipment(id: ID!)",
+      "summary": "Cancel before collection; fails once any parcel has been scanned",
+      "response": "CancelShipmentPayload!",
+      "params": [
+        {
+          "name": "id",
+          "in": "arg",
+          "type": "ID!",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "mutation-sequenceRoute",
+      "group": "mutations",
+      "method": "MUTATION",
+      "path": "sequenceRoute(routeId: ID!)",
+      "summary": "Ask the routing engine to sequence a route's stops",
+      "response": "Route!",
+      "params": [
+        {
+          "name": "routeId",
+          "in": "arg",
+          "type": "ID!",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "subscription-parcelScanned",
+      "group": "subscriptions",
+      "method": "SUBSCRIPTION",
+      "path": "parcelScanned(shipmentId: ID)",
+      "summary": "Every scan on the calling merchant's parcels, as it is ingested",
+      "response": "Scan!",
+      "params": [
+        {
+          "name": "shipmentId",
+          "in": "arg",
+          "type": "ID"
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "id": "DateTime",
+      "name": "DateTime",
+      "kind": "scalar",
+      "description": "The merchant portal's API.",
+      "fields": []
+    },
+    {
+      "id": "Shipment",
+      "name": "Shipment",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "reference",
+          "type": "String"
+        },
+        {
+          "name": "serviceLevel",
+          "type": "ServiceLevel",
+          "required": true
+        },
+        {
+          "name": "recipient",
+          "type": "Recipient",
+          "required": true
+        },
+        {
+          "name": "destination",
+          "type": "Address",
+          "required": true
+        },
+        {
+          "name": "parcels",
+          "type": "[Parcel!]",
+          "required": true
+        },
+        {
+          "name": "bookedAt",
+          "type": "DateTime",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "ShipmentConnection",
+      "name": "ShipmentConnection",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "nodes",
+          "type": "[Shipment!]",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "type": "String"
+        },
+        {
+          "name": "totalCount",
+          "type": "Int",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "Parcel",
+      "name": "Parcel",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "trackingNumber",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "ParcelStatus",
+          "required": true
+        },
+        {
+          "name": "attempts",
+          "type": "Int",
+          "required": true
+        },
+        {
+          "name": "weightGrams",
+          "type": "Int",
+          "required": true
+        },
+        {
+          "name": "scans",
+          "type": "[Scan!]",
+          "required": true
+        },
+        {
+          "name": "currentDepot",
+          "type": "Depot"
+        }
+      ]
+    },
+    {
+      "id": "Scan",
+      "name": "Scan",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "ScanType",
+          "required": true
+        },
+        {
+          "name": "scannedAt",
+          "type": "DateTime",
+          "required": true
+        },
+        {
+          "name": "receivedAt",
+          "type": "DateTime",
+          "required": true
+        },
+        {
+          "name": "depot",
+          "type": "Depot"
+        }
+      ]
+    },
+    {
+      "id": "Depot",
+      "name": "Depot",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "address",
+          "type": "Address",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "Route",
+      "name": "Route",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "serviceDate",
+          "type": "DateTime",
+          "required": true
+        },
+        {
+          "name": "sequencedAt",
+          "type": "DateTime"
+        },
+        {
+          "name": "stops",
+          "type": "[Stop!]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "Stop",
+      "name": "Stop",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "sequence",
+          "type": "Int",
+          "required": true
+        },
+        {
+          "name": "parcel",
+          "type": "Parcel",
+          "required": true
+        },
+        {
+          "name": "windowStart",
+          "type": "DateTime",
+          "required": true
+        },
+        {
+          "name": "windowEnd",
+          "type": "DateTime",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "Recipient",
+      "name": "Recipient",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "phone",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "id": "Address",
+      "name": "Address",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "required": true
+        },
+        {
+          "name": "line1",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "line2",
+          "type": "String"
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "postcode",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "country",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "BookShipmentInput",
+      "name": "BookShipmentInput",
+      "kind": "input",
+      "fields": [
+        {
+          "name": "reference",
+          "type": "String"
+        },
+        {
+          "name": "serviceLevel",
+          "type": "ServiceLevel",
+          "required": true
+        },
+        {
+          "name": "recipient",
+          "type": "RecipientInput",
+          "required": true
+        },
+        {
+          "name": "destination",
+          "type": "AddressInput",
+          "required": true
+        },
+        {
+          "name": "parcels",
+          "type": "[ParcelInput!]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "RecipientInput",
+      "name": "RecipientInput",
+      "kind": "input",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "phone",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "id": "AddressInput",
+      "name": "AddressInput",
+      "kind": "input",
+      "fields": [
+        {
+          "name": "line1",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "line2",
+          "type": "String"
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "postcode",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "country",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "ParcelInput",
+      "name": "ParcelInput",
+      "kind": "input",
+      "fields": [
+        {
+          "name": "weightGrams",
+          "type": "Int",
+          "required": true
+        },
+        {
+          "name": "reference",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "id": "BookShipmentPayload",
+      "name": "BookShipmentPayload",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "shipment",
+          "type": "Shipment",
+          "required": true
+        },
+        {
+          "name": "labelUrl",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "CancelShipmentPayload",
+      "name": "CancelShipmentPayload",
+      "kind": "object",
+      "fields": [
+        {
+          "name": "shipment",
+          "type": "Shipment",
+          "required": true
+        },
+        {
+          "name": "refundedMinor",
+          "type": "Int",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "ServiceLevel",
+      "name": "ServiceLevel",
+      "kind": "enum",
+      "values": [
+        "NEXT_DAY",
+        "TWO_DAY",
+        "ECONOMY"
+      ]
+    },
+    {
+      "id": "ParcelStatus",
+      "name": "ParcelStatus",
+      "kind": "enum",
+      "values": [
+        "CREATED",
+        "COLLECTED",
+        "AT_DEPOT",
+        "IN_TRANSIT",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "ATTEMPT_FAILED",
+        "AWAITING_INSTRUCTION",
+        "RETURNING",
+        "RETURNED",
+        "LOST",
+        "CANCELLED"
+      ]
+    },
+    {
+      "id": "ScanType",
+      "name": "ScanType",
+      "kind": "enum",
+      "values": [
+        "COLLECTION",
+        "DEPOT_INBOUND",
+        "DEPOT_OUTBOUND",
+        "VEHICLE_LOAD",
+        "DELIVERY",
+        "ATTEMPT_FAILED",
+        "RETURN"
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "title": "Source",
+      "tone": "info",
+      "items": [
+        "Imported from showcase/graphql/portal.graphql",
+        "8 operations, 19 types shown"
+      ]
+    }
+  ]
+}

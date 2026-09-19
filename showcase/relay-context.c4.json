@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "c4",
+  "meta": {
+    "id": "relay-context.c4",
+    "title": "Relay in its world",
+    "subtitle": "C4 level 1: who Relay serves and what it depends on. Start here.",
+    "level": "context",
+    "scope": "Relay",
+    "repository": { "url": "https://github.com/example/relay", "revision": "main" }
+  },
+  "elements": [
+    { "id": "merchant", "kind": "person", "label": "Merchant", "description": "Books shipments and pays for them" },
+    { "id": "recipient", "kind": "person", "label": "Recipient", "description": "Waits in, or does not" },
+    { "id": "courier", "kind": "person", "label": "Courier", "description": "Collects, sorts and delivers" },
+
+    { "id": "relay", "kind": "system", "label": "Relay", "description": "Moves parcels from a merchant's shelf to a doorstep, and bills for it", "link": "relay.c4.html" },
+
+    { "id": "partners", "kind": "system", "label": "Partner carriers", "external": true, "description": "Final mile in postcodes Relay does not serve" },
+    { "id": "addressing", "kind": "system", "label": "Loqate", "external": true, "description": "Address validation and geocoding" },
+    { "id": "sms", "kind": "system", "label": "Twilio", "external": true, "description": "The SMS a recipient actually reads" },
+    { "id": "bank", "kind": "system", "label": "Banking partner", "external": true, "description": "Collects payment against an invoice" }
+  ],
+  "relationships": [
+    { "from": "merchant", "to": "relay", "label": "Books shipments with", "technology": "HTTPS" },
+    { "from": "recipient", "to": "relay", "label": "Tracks and reschedules with", "technology": "HTTPS" },
+    { "from": "courier", "to": "relay", "label": "Scans parcels into", "technology": "mTLS" },
+    { "from": "relay", "to": "recipient", "label": "Texts a delivery window to", "technology": "SMS", "style": "dashed" },
+    { "from": "relay", "to": "partners", "label": "Hands off out-of-area parcels to", "technology": "HTTPS" },
+    { "from": "relay", "to": "addressing", "label": "Validates addresses with", "technology": "HTTPS" },
+    { "from": "relay", "to": "sms", "label": "Sends messages through", "technology": "HTTPS" },
+    { "from": "relay", "to": "bank", "label": "Collects invoice payments through", "technology": "HTTPS" }
+  ],
+  "cards": [
+    { "title": "Read this first", "tone": "info", "items": ["One box for Relay. Open it in \"Relay — parcel network\" to see the containers inside.", "Everything grey is somebody else's system and can fail independently of ours."] }
+  ]
+}
