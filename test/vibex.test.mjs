@@ -1304,3 +1304,21 @@ test('layout: the least-bad position is chosen when every candidate collides', (
   assert.equal(overlapArea({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 }), 25);
   assert.equal(overlapArea({ x: 0, y: 0, w: 10, h: 10 }, { x: 20, y: 0, w: 10, h: 10 }), 0);
 });
+
+// The release checklist asked a human to keep these two in step, which is the
+// kind of rule that holds until the one release nobody is concentrating on.
+// The skill reports its own version to agents; the package reports it to npm.
+// A mismatch means one of them is lying and nothing else notices.
+test('release: package.json and SKILL.md declare the same version', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  const skill = /\n {2}version: "([^"]+)"/.exec(fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8'));
+  assert.ok(skill, 'SKILL.md declares metadata.version');
+  assert.equal(skill[1], pkg, `SKILL.md says ${skill?.[1]}, package.json says ${pkg}`);
+});
+
+test('release: the changelog has a section for the version being shipped', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  assert.match(log, new RegExp(`^## \\[${pkg.replace(/\./g, '\\.')}\\] - \\d{4}-\\d{2}-\\d{2}`, 'm'),
+    `CHANGELOG.md has no dated section for ${pkg}`);
+});

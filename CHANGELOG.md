@@ -4,6 +4,13 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-09-19
+
+Four diagram types, documentation as a checkable fact graph, and a release list
+built from git history.
+
 ### Changed
 - Redesigned the generated viewer shell: icon toolbar with segmented zoom/export controls, dot-grid canvas, floating hint pill, sectioned side panel, scrollable detail tables that drop empty columns, tinted note cards, styled scrollbars, and a print stylesheet.
 - Dashboard: brand mark, per-type colour dots in the sidebar, a totals strip on the overview, tiles that lift on hover, and a two-column stat grid on phones.
@@ -59,11 +66,25 @@ First release.
 
 ## Release checklist
 
-1. `npm test` and `node bin/vibex.mjs demo out` pass locally with no `warning` lines on stderr.
-2. Bump the version in **both** `package.json` (`"version"`) and `SKILL.md` (`metadata.version`); they must be identical, e.g. `0.2.0`.
-3. Add a `## [x.y.z] - YYYY-MM-DD` section and move items out of Unreleased.
-4. `npm pack --dry-run` and confirm `assets/dashboard.html`, `assets/template.html`, `assets/viewer.js`, `assets/viewer.css`, `SKILL.md`, `LICENSE` are listed.
-5. `git commit -am "release x.y.z" && git tag vx.y.z && git push --follow-tags`.
-6. Wait for CI (Node 18/20/22) to be green on the tag.
-7. Optional npm path: `npm publish --access public` (runs `prepublishOnly` = `npm test`). Smoke: `npx @vibex/vibex@x.y.z demo /tmp/vibex-smoke`.
-8. Skill path smoke: `npx skills add Raja0sama/vibex` in a scratch project, then `node ~/.claude/skills/vibex/bin/vibex.mjs types`.
+Publishing happens in CI, on a tag. Nothing is published from a laptop — npm
+requires an interactive 2FA prompt there, and a release should not depend on
+somebody being awake for it.
+
+1. `npm test` and `node bin/vibex.mjs demo out` pass with no `warning` lines on stderr.
+2. Bump the version in `package.json`. `SKILL.md` (`metadata.version`) must match —
+   a test enforces this, so a mismatch fails the build rather than shipping.
+3. Move everything out of `## [Unreleased]` into a dated `## [x.y.z] - YYYY-MM-DD`
+   section, and leave a fresh empty Unreleased behind. A test checks the version
+   being shipped has a section.
+4. `git commit -am "release x.y.z" && git tag vx.y.z && git push --follow-tags`.
+5. The `publish` workflow takes it from there: it refuses a tag that disagrees with
+   `package.json`, runs the suite, installs the packed tarball into an empty
+   directory and runs `vibex demo` against it, then publishes.
+6. Confirm: `npx @vibex/vibex@x.y.z demo /tmp/vibex-smoke`.
+7. Skill path: `npx skills add Raja0sama/vibex` in a scratch project, then
+   `node ~/.claude/skills/vibex/bin/vibex.mjs types`.
+
+Versioning is SemVer, pre-1.0: a new diagram or spec type, or anything that
+changes what a generated file contains, is a minor. Bug fixes are a patch.
+`schema_version` inside a spec is separate and only moves on a breaking change
+to the authoring contract.
