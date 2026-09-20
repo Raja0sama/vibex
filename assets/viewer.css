@@ -399,6 +399,9 @@ nav a[data-proposed] .t em{font-style:normal;font-size:10px;text-transform:upper
 .cards-bar .n{font-family:var(--font-mono);font-size:10px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border-soft);border-radius:99px;padding:1px 7px}
 .cards-bar .i{width:13px;height:13px;margin-left:auto;transition:transform .17s ease}
 .cards-bar[aria-expanded="true"] .i{transform:rotate(90deg)}
+/* .cards sets display:grid, and an author rule beats the UA stylesheet's
+   [hidden]{display:none} — so the attribute needs saying again here. */
+.cards[hidden]{display:none}
 .cards-bar+.cards{border-top:0}
 
 @media (max-width:900px){
