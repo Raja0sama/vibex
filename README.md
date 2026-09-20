@@ -32,7 +32,8 @@ Then it documents the system in claims that fail CI when the code moves undernea
 → **one command, run against the schema that actually ships.**
 
 ```bash
-npx @vibex/vibex demo out && open out/dashboard.html
+cd ~ && npx skills add Raja0sama/vibex    # install the skill, then just ask
+npx @vibex/vibex demo out                # or look first — installs nothing
 ```
 
 <div align="center">
@@ -108,14 +109,16 @@ schema, picks the diagram type, writes the spec and renders it:
   wrote auth.docs.json · 41 claims, 38 verified
 ```
 
-**Install it.** `SKILL.md` ships inside the npm package, so a global install plus one
-symlink is all it takes — and you get a pinned version rather than whatever is in a
-working copy:
+**Install it.** One command, from your home directory:
 
 ```bash
-npm i -g @vibex/vibex
-ln -s "$(npm root -g)/@vibex/vibex" ~/.claude/skills/vibex
+cd ~ && npx skills add Raja0sama/vibex
 ```
+
+The directory matters, and it is the thing people get wrong: `skills add` installs
+relative to where you run it. From `~` the skill is available in every project. From a
+project directory it travels with that repository and nowhere else — which is what you
+want when the skill should be checked in alongside the code.
 
 Check it landed:
 
@@ -123,20 +126,32 @@ Check it landed:
 node ~/.claude/skills/vibex/bin/vibex.mjs types
 ```
 
-Then just ask. Claude picks the skill up from the folder name; the CLI underneath is
-there when you want it, not something you have to learn first.
+Then just ask. Claude picks the skill up from the folder name, and the CLI underneath is
+what the skill drives — it is there when you want it, not something you have to learn first.
 
 <details>
-<summary><b>Other ways in</b> — project-local, from source, or the skills registry</summary>
+<summary><b>Other ways in</b> — per-project, pinned to a release, or from source</summary>
 
 <br>
 
-**Project-local**, so the skill travels with the repository rather than your machine:
+**Per-project**, so the skill is checked in beside the code it documents:
 
 ```bash
-mkdir -p .claude/skills
-ln -s "$(npm root -g)/@vibex/vibex" .claude/skills/vibex
+cd my-project && npx skills add Raja0sama/vibex
 ```
+
+**Pinned to a published version**, if you would rather have a release than a clone of
+`main`. `SKILL.md` ships inside the npm package, so a global install plus one symlink
+does it:
+
+```bash
+npm i -g @vibex/vibex
+ln -s "$(npm root -g)/@vibex/vibex" ~/.claude/skills/vibex
+```
+
+> Under nvm, `npm root -g` is scoped to the Node version you are on
+> (`~/.nvm/versions/node/v22.18.0/...`). Install a new Node and both the `vibex` binary
+> and this symlink stop resolving, silently. `skills add` has no such problem.
 
 **From source**, if you are changing vibeX itself — the symlink tracks your working copy,
 so edits apply the moment you save:
@@ -146,19 +161,9 @@ git clone https://github.com/Raja0sama/vibex && cd vibex
 ln -s "$(pwd)" ~/.claude/skills/vibex
 ```
 
-**From the skills registry** — `skills add` takes GitHub repositories, not npm packages.
-It installs relative to the directory you run it in, which is the part worth getting
-right: from your home directory the skill is available everywhere, from a project
-directory it travels with that project and nowhere else.
-
-```bash
-cd ~ && npx skills add Raja0sama/vibex     # every project
-npx skills add Raja0sama/vibex             # this project only
-```
-
-This clones the repository rather than the npm package, so it brings the site and the
-showcase with it, and it has no `node_modules` — run `npm install` inside the skill
-folder if you need YAML OpenAPI.
+`skills add` clones the repository rather than the npm package, so it brings the site and
+the showcase with it, and it has no `node_modules` — run `npm install` inside the skill
+folder if you need YAML OpenAPI. The npm paths above already have it.
 
 </details>
 
@@ -355,11 +360,19 @@ A new diagram type is a schema, a validator function, a renderer that emits
 ## Install
 
 ```bash
-npm i -g @vibex/vibex               # the CLI, and the skill source above
-npx @vibex/vibex demo out           # or run it once without installing
+cd ~ && npx skills add Raja0sama/vibex   # the skill, in every project
 ```
 
-> The unscoped `vibex` on npm is an unrelated package. Always install `@vibex/vibex`.
+The CLI comes with it and is what the skill drives. If you want it on your `PATH` as
+well, or pinned to a published release rather than a clone of `main`:
+
+```bash
+npm i -g @vibex/vibex               # adds the `vibex` command
+npx @vibex/vibex demo out           # or run it once without installing anything
+```
+
+> The unscoped `vibex` on npm is an unrelated package by another author. Always
+> install `@vibex/vibex`.
 
 Node 18+. Zero required dependencies. The optional `yaml` package is only needed
 if your OpenAPI document is YAML rather than JSON.

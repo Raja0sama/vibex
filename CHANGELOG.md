@@ -4,7 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+- **The skill is the way in, everywhere.** README and landing page now lead with `cd ~ && npx skills add Raja0sama/vibex`, with the CLI presented as what the skill drives rather than as the thing you install first.
+  `skills add` resolves relative to the directory you run it in, which is the failure people actually hit: run it in a project and the skill exists only there. That is now stated wherever the command appears. The npm global install stays as the pinned-release route, with a warning that under nvm `npm root -g` is scoped to the current Node version, so the symlink dies silently on an upgrade.
+- The README claimed the repository was private and that `skills add` "does not work yet". It has been public since before 0.2.0 and the command works.
 
 ## [0.3.0] - 2026-09-20
 

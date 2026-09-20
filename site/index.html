@@ -366,7 +366,7 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       <a class="btn btn-primary" href="demo/dashboard.html">Open the live demo
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px" aria-hidden="true"><path d="M4 12h14"/><path d="M13 7l5 5-5 5"/></svg>
       </a>
-      <span class="cmd"><b>$</b> npm i -g @vibex/vibex</span>
+      <span class="cmd"><b>$</b> cd ~ &amp;&amp; npx skills add Raja0sama/vibex</span>
     </div>
     <p class="fineprint">A Claude Code / Cursor skill, with a CLI underneath &middot; MIT &middot; Node 18+ &middot; zero dependencies &middot; no build step</p>
 
@@ -730,12 +730,11 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
         <p class="eyebrow">INSTALL IT AS A SKILL</p>
         <h2 style="margin-top:16px">Stop learning flags</h2>
         <p>vibeX is a Claude Code / Cursor skill first and a CLI second. Installed as a skill, the whole command surface collapses into a sentence &mdash; Claude reads <code style="font-size:14px;color:var(--text)">SKILL.md</code>, finds your schema, picks the type, writes the spec and renders it.</p>
-        <p style="margin-top:14px"><code style="font-size:14px;color:var(--text)">SKILL.md</code> ships inside the npm package, so a global install and one symlink is the whole setup &mdash; and you get a pinned version rather than whatever is in a working copy.</p>
+        <p style="margin-top:14px">One command, from your home directory. <code style="font-size:14px;color:var(--text)">skills add</code> installs relative to where you run it &mdash; from <code style="font-size:14px;color:var(--text)">~</code> the skill is available in every project, from a project directory it travels with that repository.</p>
         <div class="term" style="margin-top:20px;line-height:1.85">
-          <div><span style="color:var(--ep)">$</span> npm i -g @vibex/vibex</div>
-          <div><span style="color:var(--ep)">$</span> ln -s "$(npm root -g)/@vibex/vibex" \</div>
-          <div>&nbsp;&nbsp;&nbsp;&nbsp;~/.claude/skills/vibex</div>
+          <div><span style="color:var(--ep)">$</span> cd ~ &amp;&amp; npx skills add Raja0sama/vibex</div>
         </div>
+        <p style="margin-top:14px">The CLI comes with it and is what the skill drives. <code style="font-size:14px;color:var(--text)">npm i -g @vibex/vibex</code> also works if you want the <code style="font-size:14px;color:var(--text)">vibex</code> command on your PATH, or a published release rather than a clone of main.</p>
       </div>
       <div class="term">
         <div class="q">&gt; show me the data model</div>
@@ -1088,25 +1087,24 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
   <section class="wrap" id="start">
     <div class="start">
       <div>
-        <h2 class="sec">Clone it and it runs</h2>
-        <p class="lead">No install step, no config file, no account, no sign-up wall between you and the thing. The only optional dependency is a YAML parser, and only if your OpenAPI document is YAML.</p>
+        <h2 class="sec">Install it once, then ask</h2>
+        <p class="lead">No config file, no account, no sign-up wall between you and the thing. The skill drives the CLI, so you can read exactly what it ran &mdash; and run it yourself. The only optional dependency is a YAML parser, and only if your OpenAPI document is YAML.</p>
         <div class="road">
           <h3>ON THE ROADMAP</h3>
           <p>A GitHub Action that runs in <em>your</em> CI, regenerates the diagrams on every pull request, and comments what moved — <span class="mono" style="font-size:13.5px">&ldquo;2 tables, 3 endpoints&rdquo;</span>. Still no server. Still nothing leaving your network.</p>
         </div>
       </div>
       <div class="block">
-        <div class="d"># render the bundled examples</div>
-        <div><span class="p">$</span> vibex demo out</div>
+        <div class="d"># install the skill, once</div>
+        <div><span class="p">$</span> cd ~ &amp;&amp; npx skills add Raja0sama/vibex</div>
         <div>&nbsp;</div>
-        <div class="d"># your Prisma schema, as an ERD</div>
+        <div class="d"># then, in Claude Code or Cursor</div>
+        <div><span class="p">&gt;</span> <span class="s">show me the data model</span></div>
+        <div>&nbsp;</div>
+        <div class="d"># what the skill ran for you</div>
         <div><span class="p">$</span> vibex import prisma \</div>
         <div>&nbsp;&nbsp;&nbsp;&nbsp;prisma/schema.prisma docs/db.erd.json</div>
         <div><span class="p">$</span> vibex render docs/db.erd.json --open</div>
-        <div>&nbsp;</div>
-        <div class="d"># every spec in one page</div>
-        <div><span class="p">$</span> vibex dashboard docs/index.html docs \</div>
-        <div>&nbsp;&nbsp;&nbsp;&nbsp;--title <span class="s">"Payments platform"</span></div>
       </div>
     </div>
   </section>
