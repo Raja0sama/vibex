@@ -162,6 +162,10 @@ section{padding-block:clamp(56px,8vw,96px) 0}
 .dead-out{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:clamp(15px,2vw,17px);font-weight:500}
 .dead-out svg{width:18px;height:18px;flex:none;color:var(--accent)}
 
+/* ---------- demo film ---------- */
+.film{margin-top:24px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--s-bg)}
+.film iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
+
 /* ---------- why ---------- */
 .why{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(24px,4vw,44px);margin-top:30px}
 .why>div{padding-left:22px;border-left:2px solid var(--border);transition:border-color .2s ease}
@@ -320,6 +324,7 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       vibeX
     </a>
     <nav>
+      <a href="#watch">Watch</a>
       <a href="#diagrams">Diagrams</a>
       <a href="#docs">Docs</a>
       <a href="#skill">Skill</a>
@@ -451,6 +456,18 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15"/><path d="M14 7l5 5-5 5"/></svg>
       one command, run against the schema that actually ships
     </p>
+  </section>
+
+  <section class="wrap" id="watch">
+    <p class="eyebrow">SEE IT RUN</p>
+    <div class="film">
+      <iframe src="https://www.youtube-nocookie.com/embed/SovgqAX7oSY"
+              title="vibeX demo"
+              loading="lazy"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen></iframe>
+    </div>
   </section>
 
   <section class="wrap">
