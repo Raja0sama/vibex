@@ -419,6 +419,113 @@
     this.spec = spec;
   }
 
+  // ---------- collapsible chrome (global, every panel) ----------
+  // The canvas is what the reader came for, so the panels around it can get out
+  // of the way. Collapsing is not hiding: the aside keeps its section headings
+  // legible down the edge, and clicking one reopens the panel at that section.
+  // State is remembered per panel, so a reader who wants the canvas wide keeps it.
+  var CHEVRON = '<svg class="i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.2 3.4 10.8 8l-4.6 4.6"/></svg>';
+  var asides = [];
+  var noteBars = [];
+
+  // localStorage is a convenience here, never a requirement: a browser that
+  // refuses it still opens on a sane default.
+  function remember(key, collapsed) { try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch (e) {} }
+  function recall(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+  function panelKey(el, prefix) {
+    var panel = el.closest ? el.closest('.panel') : null;
+    return 'vibex-' + prefix + ':' + ((panel && panel.getAttribute('data-panel')) || 'single');
+  }
+
+  function collapsibleAside(body) {
+    var aside = body.querySelector('aside');
+    if (!aside || aside.getAttribute('data-collapsible')) return;
+    aside.setAttribute('data-collapsible', '1');
+    var key = panelKey(body, 'aside');
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'p-toggle';
+    btn.innerHTML = CHEVRON + '<span class="lbl"></span>';
+    aside.insertBefore(btn, aside.firstChild);
+
+    function apply(collapsed, persist) {
+      body.classList.toggle('aside-min', collapsed);
+      var label = collapsed ? 'Show panel' : 'Hide panel';
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      btn.setAttribute('aria-label', label);
+      btn.title = label + '  ]';
+      btn.querySelector('.lbl').textContent = label;
+      if (persist) remember(key, collapsed);
+    }
+    function toggle() { apply(!body.classList.contains('aside-min'), true); }
+
+    btn.addEventListener('click', toggle);
+
+    // While collapsed, a section heading is the way back into that section.
+    Array.prototype.forEach.call(aside.children, function (sec) {
+      if (sec.tagName !== 'SECTION') return;
+      sec.addEventListener('click', function () {
+        if (!body.classList.contains('aside-min')) return;
+        apply(false, true);
+        if (sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest' });
+      });
+    });
+
+    apply(recall(key) === '1', false);
+    asides.push({ el: body, toggle: toggle });
+  }
+
+  function collapsibleNotes(shell) {
+    var cards = shell.querySelector('.cards');
+    if (!cards || !cards.children.length || cards.getAttribute('data-collapsible')) return;
+    cards.setAttribute('data-collapsible', '1');
+    var key = panelKey(cards, 'notes');
+    var n = cards.children.length;
+
+    var bar = document.createElement('button');
+    bar.type = 'button';
+    bar.className = 'cards-bar';
+    bar.innerHTML = '<span>Notes</span><span class="n">' + n + '</span>' + CHEVRON;
+    cards.parentNode.insertBefore(bar, cards);
+
+    function apply(open, persist) {
+      cards.hidden = !open;
+      bar.setAttribute('aria-expanded', open ? 'true' : 'false');
+      bar.title = (open ? 'Hide' : 'Show') + ' notes  \\';
+      if (persist) remember(key, !open);
+    }
+    function toggle() { apply(cards.hidden, true); }
+
+    bar.addEventListener('click', toggle);
+    apply(recall(key) !== '1', false);
+    noteBars.push({ el: bar, toggle: toggle });
+  }
+
+  // Act on the panel the reader is actually looking at. A dashboard keeps every
+  // other panel in the DOM but not on screen, and offsetParent is what tells
+  // them apart without asking the dashboard about itself.
+  function onScreen(list) {
+    for (var i = 0; i < list.length; i++) if (list[i].el.offsetParent !== null) return list[i];
+    return null;
+  }
+
+  function initChrome() {
+    Array.prototype.forEach.call(document.querySelectorAll('.viewer-body,.docs-body'), collapsibleAside);
+    Array.prototype.forEach.call(document.querySelectorAll('.viewer,.docs-shell'), collapsibleNotes);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var hit = e.key === ']' ? onScreen(asides) : e.key === '\\' ? onScreen(noteBars) : null;
+    if (hit) { e.preventDefault(); hit.toggle(); }
+  });
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initChrome);
+  else initChrome();
+
   global.VibexViewer = Viewer;
   global.VibexTheme = { set: setTheme, toggle: toggleTheme };
 })(window);

@@ -32,6 +32,25 @@ nav a.active .n{background:color-mix(in srgb,var(--accent) 16%,transparent);colo
 nav .foot{margin-top:auto;padding:13px 15px;font-size:10.5px;color:var(--text-3);border-top:1px solid var(--border-soft);line-height:1.9}
 nav .foot kbd{font-family:var(--font-mono);font-size:10px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:4px;padding:1px 4px;color:var(--text-2)}
 nav .foot button{width:100%;margin-top:9px;justify-content:center}
+/* A dashboard is mostly canvas, so the index can step aside. Collapsed it keeps
+   the type dots and the active marker, which is enough to navigate by. */
+body{transition:grid-template-columns .17s ease}
+body.nav-min{grid-template-columns:62px minmax(0,1fr)}
+.nav-min nav .brand{justify-content:center;padding:16px 0 14px}
+.nav-min nav .brand .txt{display:none}
+.nav-min nav .group{padding:10px 8px 2px}
+.nav-min nav .group h2{display:none}
+.nav-min nav a{justify-content:center;padding:9px 0}
+.nav-min nav a .t,.nav-min nav a .n{display:none}
+.nav-min nav a .dot{width:9px;height:9px}
+.nav-min nav a.active::before{left:-8px}
+.nav-min nav .foot{padding:10px 8px}
+.nav-min nav .foot .keys,.nav-min nav .foot button[data-role=theme-global]{display:none}
+.nav-min nav .foot button[data-role=nav-toggle] .lbl{display:none}
+.nav-min nav .foot button[data-role=nav-toggle]{padding:8px 0}
+nav .foot button[data-role=nav-toggle]{display:flex;align-items:center;justify-content:center;gap:7px}
+nav .foot button[data-role=nav-toggle] .i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .17s ease}
+nav .foot button[data-role=nav-toggle][aria-expanded=true] .i{transform:rotate(180deg)}
 main{min-height:0;display:flex;flex-direction:column;background:var(--bg)}
 .panel{display:none;min-height:0;height:100%}
 .panel.active{display:flex;flex-direction:column}
@@ -71,6 +90,8 @@ main{min-height:0;display:flex;flex-direction:column;background:var(--bg)}
 .empty-note code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);border-radius:4px;padding:1px 5px}
 @media (max-width:900px){
 body{grid-template-columns:minmax(0,1fr);height:auto}
+body.nav-min{grid-template-columns:minmax(0,1fr)}
+nav .foot button[data-role=nav-toggle]{display:none}
 nav{border-right:none;border-bottom:1px solid var(--border-soft);min-width:0;overflow:visible}
 nav .brand{padding:12px 14px 10px;border-bottom:none}
 nav .group{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:4px 12px 8px;scrollbar-width:thin}
@@ -100,7 +121,7 @@ nav .foot button{width:auto;margin:0}
   </div>
   <div class="group"><a href="#" data-panel="overview" class="active" aria-current="page"><span class="dot"></span><span class="t">Overview</span></a></div>
   <!-- VIBEX:NAV -->
-  <div class="foot"><span class="keys"><kbd>/</kbd> search · <kbd>esc</kbd> clear · <kbd>t</kbd> theme · <kbd>0</kbd> fit</span><button type="button" data-role="theme-global">Toggle theme</button></div>
+  <div class="foot"><span class="keys"><kbd>/</kbd> search · <kbd>esc</kbd> clear · <kbd>t</kbd> theme · <kbd>0</kbd> fit · <kbd>[</kbd><kbd>]</kbd> panels</span><button type="button" data-role="theme-global">Toggle theme</button><button type="button" data-role="nav-toggle" aria-expanded="true"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.2 3.4 10.8 8l-4.6 4.6"/></svg><span class="lbl">Collapse index</span></button></div>
 </nav>
 <main>
   <section class="panel overview active" data-panel="overview"><!-- VIBEX:OVERVIEW --></section>
@@ -253,6 +274,36 @@ nav .foot button{width:auto;margin:0}
       setTimeout(function () { target.classList.remove('flash'); }, 1200);
     });
   });
+
+  // The index can step aside. Collapsed, each entry keeps its colour dot, so the
+  // title moves to a tooltip rather than disappearing.
+  (function () {
+    var btn = document.querySelector('[data-role=nav-toggle]');
+    if (!btn) return;
+    Array.prototype.forEach.call(document.querySelectorAll('nav a[data-panel]'), function (a) {
+      var t = a.querySelector('.t');
+      if (t && !a.title) a.title = t.textContent;
+    });
+    function apply(collapsed, persist) {
+      document.body.classList.toggle('nav-min', collapsed);
+      var label = collapsed ? 'Expand index' : 'Collapse index';
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      btn.setAttribute('aria-label', label);
+      btn.title = label + '  [';
+      var lbl = btn.querySelector('.lbl');
+      if (lbl) lbl.textContent = label;
+      if (persist) { try { localStorage.setItem('vibex-nav', collapsed ? '1' : '0'); } catch (e) {} }
+    }
+    btn.addEventListener('click', function () { apply(!document.body.classList.contains('nav-min'), true); });
+    document.addEventListener('keydown', function (e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '[') { e.preventDefault(); apply(!document.body.classList.contains('nav-min'), true); }
+    });
+    var stored = null;
+    try { stored = localStorage.getItem('vibex-nav'); } catch (e) {}
+    apply(stored === '1', false);
+  })();
 })();
 </script>
 </body>

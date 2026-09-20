@@ -4,7 +4,9 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- **Every panel around the canvas now collapses, and remembers it.** The dashboard index, the right-hand details panel and the notes strip each take a click or a key — `[`, `]` and `\` — and the choice is kept per panel across reloads.
+  Collapsing is not hiding. The index keeps its colour dots and its active marker, and the details panel keeps `Details`, `Legend` and `Stats` readable down its edge; clicking one reopens the panel at that section. A reader who wants the diagram wide gets it without losing their way back.
 
 ## [0.2.1] - 2026-09-20
 
