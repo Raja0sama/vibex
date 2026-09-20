@@ -146,12 +146,19 @@ git clone https://github.com/Raja0sama/vibex && cd vibex
 ln -s "$(pwd)" ~/.claude/skills/vibex
 ```
 
-**From the skills registry** — `skills add` takes GitHub repositories, not npm packages,
-so this needs the repository to be public. It is private today, so this does not work yet:
+**From the skills registry** — `skills add` takes GitHub repositories, not npm packages.
+It installs relative to the directory you run it in, which is the part worth getting
+right: from your home directory the skill is available everywhere, from a project
+directory it travels with that project and nowhere else.
 
 ```bash
-npx skills add Raja0sama/vibex     # once the repository is public
+cd ~ && npx skills add Raja0sama/vibex     # every project
+npx skills add Raja0sama/vibex             # this project only
 ```
+
+This clones the repository rather than the npm package, so it brings the site and the
+showcase with it, and it has no `node_modules` — run `npm install` inside the skill
+folder if you need YAML OpenAPI.
 
 </details>
 

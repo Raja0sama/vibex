@@ -297,7 +297,7 @@ derived from the spec the same way a binary is derived from source, and a
 hand-patched artifact is one no version of this tool would ever have produced.
 If the *spec* is what is wrong, fix the spec and re-render.
 
-YAML OpenAPI needs the optional `yaml` package: run `npm install` inside the skill root once (installed automatically on the `npx vibex` path), or convert the file to JSON.
+YAML OpenAPI needs the optional `yaml` package: run `npm install` inside the skill root once (already present if the skill came from a global `npm i -g @vibex/vibex`), or convert the file to JSON.
 
 ## Viewer
 
