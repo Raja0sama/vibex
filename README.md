@@ -35,7 +35,13 @@ Then it documents the system in claims that fail CI when the code moves undernea
 npx @vibex/vibex demo out && open out/dashboard.html
 ```
 
-<!-- TODO: replace with a real screen recording of the viewer once the demo is deployed -->
+<div align="center">
+
+[![vibeX: four diagrams and a checkable document, from one command](https://img.youtube.com/vi/SovgqAX7oSY/hqdefault.jpg)](https://www.youtube.com/watch?v=SovgqAX7oSY)
+
+**[Watch the demo](https://www.youtube.com/watch?v=SovgqAX7oSY)**
+
+</div>
 
 ## Why "vibeX"
 
@@ -385,9 +391,7 @@ Diagrams-as-code is a well-populated field, and vibeX stands on a lot of it:
 for turning text into a picture, [Structurizr](https://structurizr.com) for treating C4 as a model
 rather than a drawing, [DBML](https://github.com/holistics/dbml) for schema-to-ERD,
 [Graphviz](https://graphviz.org) for deterministic layout, and
-[tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT) for the
-JSON-IR to deterministic SVG to self-contained viewer shape.
-Ideas only — no code from any of them was reused.
+[tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT) 
 
 <div align="center">
 
