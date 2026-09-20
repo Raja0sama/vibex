@@ -4,6 +4,13 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.1] - 2026-09-20
+
+Install instructions only. No change to the CLI, the renderers, or anything a
+generated file contains.
+
 ### Changed
 - **The skill is the way in, everywhere.** README and landing page now lead with `cd ~ && npx skills add Raja0sama/vibex`, with the CLI presented as what the skill drives rather than as the thing you install first.
   `skills add` resolves relative to the directory you run it in, which is the failure people actually hit: run it in a project and the skill exists only there. That is now stated wherever the command appears. The npm global install stays as the pinned-release route, with a warning that under nvm `npm root -g` is scoped to the current Node version, so the symlink dies silently on an upgrade.
