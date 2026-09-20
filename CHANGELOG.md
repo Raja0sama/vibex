@@ -4,6 +4,13 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.0] - 2026-09-20
+
+Generated files can now say what built them, and every panel around the canvas
+gets out of its way. Both change what a generated file contains, so this is a minor.
+
 ### Added
 - **`vibex outdated <dir>` — which generated files this version would now render differently.** Every generated file records what produced it: `generator` for a person, and a build fingerprint for a machine. The fingerprint covers every renderer and every inlined asset, not just the version, so a fix that only touched `viewer.css` is as detectable as a release. It exits 1 when anything is stale, so CI can gate on it the way it gates on documentation drift.
   A stale artifact and a broken feature look identical to whoever opens the file; this is how you tell them apart. What it does not answer is whether the *spec* moved — a generated file carries its own spec, but renderers normalise before embedding, so a truthful answer there means re-rendering rather than diffing JSON.
