@@ -6,6 +6,18 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 Nothing yet.
 
+## [0.2.1] - 2026-09-20
+
+Documentation, README and landing page. No change to the CLI, the renderers, the
+schemas, or anything a generated file contains.
+
+### Changed
+- The README leads with the skill rather than the CLI, and folds its reference material into collapsible sections.
+- The demo is shown rather than promised: a linked thumbnail in the README, and an embedded player on the landing page.
+- Attribution is now a `Prior art` section crediting the wider diagrams-as-code field — Mermaid, PlantUML, Structurizr, DBML, Graphviz and archify — instead of naming a single project.
+- The landing page gained depth, and its nav no longer swallows the heading you jumped to.
+- Article drafts are no longer tracked; `content/` is ignored.
+
 ## [0.2.0] - 2026-09-19
 
 Four diagram types, documentation as a checkable fact graph, and a release list
