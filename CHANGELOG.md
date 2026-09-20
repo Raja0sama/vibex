@@ -92,7 +92,9 @@ somebody being awake for it.
 3. Move everything out of `## [Unreleased]` into a dated `## [x.y.z] - YYYY-MM-DD`
    section, and leave a fresh empty Unreleased behind. A test checks the version
    being shipped has a section.
-4. `git commit -am "release x.y.z" && git tag vx.y.z && git push --follow-tags`.
+4. `git commit -am "release x.y.z" && git tag -a vx.y.z -m "vx.y.z" && git push --follow-tags`.
+   The tag must be annotated: `--follow-tags` pushes annotated tags only, so a
+   lightweight `git tag vx.y.z` is silently left behind and the release never runs.
 5. The `publish` workflow takes it from there: it refuses a tag that disagrees with
    `package.json`, runs the suite, installs the packed tarball into an empty
    directory and runs `vibex demo` against it, then publishes.
