@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { esc } from './utils.mjs';
+import { stampHtml } from './stamp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const TEMPLATE_PATH = path.resolve(here, '../../assets/template.html');
 export const VIEWER_JS_PATH = path.resolve(here, '../../assets/viewer.js');
 export const VIEWER_CSS_PATH = path.resolve(here, '../../assets/viewer.css');
 
-const SLOTS = ['<!-- VIBEX:TITLE -->', '<!-- VIBEX:SUBTITLE -->', '<!-- VIBEX:SVG -->', '<!-- VIBEX:LEGEND -->', '<!-- VIBEX:CARDS -->', '<!-- VIBEX:SPEC -->', '<!-- VIBEX:TYPE -->', '<!-- VIBEX:THEME -->', '<!-- VIBEX:CSS -->', '<!-- VIBEX:VIEWER_JS -->', '<!-- VIBEX:ACTIONS -->'];
+const SLOTS = ['<!-- VIBEX:TITLE -->', '<!-- VIBEX:SUBTITLE -->', '<!-- VIBEX:SVG -->', '<!-- VIBEX:LEGEND -->', '<!-- VIBEX:CARDS -->', '<!-- VIBEX:SPEC -->', '<!-- VIBEX:TYPE -->', '<!-- VIBEX:THEME -->', '<!-- VIBEX:CSS -->', '<!-- VIBEX:VIEWER_JS -->', '<!-- VIBEX:ACTIONS -->', '<!-- VIBEX:STAMP -->'];
 
 // Inline stroke icons. No icon font, no network request, themed by currentColor.
 export const ICON = {
@@ -43,6 +44,8 @@ export function assetSlots() {
     VIEWER_JS: fs.readFileSync(VIEWER_JS_PATH, 'utf8').replace(/<\/script/gi, '<\\/script'),
     CSS: fs.readFileSync(VIEWER_CSS_PATH, 'utf8'),
     ACTIONS: TOOLBAR_ACTIONS,
+    // Every shell that inlines the assets also records which assets it inlined.
+    STAMP: stampHtml(),
   };
 }
 

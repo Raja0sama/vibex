@@ -130,7 +130,10 @@ function overviewHtml(title, subtitle, entries) {
 }
 
 export function loadDashboardTemplate(templatePath = DASHBOARD_TEMPLATE_PATH) {
-  return fs.readFileSync(templatePath, 'utf8');
+  const template = fs.readFileSync(templatePath, 'utf8');
+  // A shell that forgets the stamp ships a file that cannot say what built it.
+  if (!template.includes('<!-- VIBEX:STAMP -->')) throw new Error('dashboard template is missing slot <!-- VIBEX:STAMP -->');
+  return template;
 }
 
 // specs: array of { spec, file } where file is the spec's basename without extension.
