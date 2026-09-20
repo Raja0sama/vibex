@@ -376,8 +376,18 @@ These are being designed, not finished. If one of them is the reason you'd adopt
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Inspired by [tt-a1i/archify](https://github.com/tt-a1i/archify)
-(MIT): same JSON-IR → deterministic SVG → self-contained viewer idea. Ideas only; no code was reused.
+MIT, see [LICENSE](LICENSE).
+
+### Prior art
+
+Diagrams-as-code is a well-populated field, and vibeX stands on a lot of it:
+[Mermaid](https://github.com/mermaid-js/mermaid) and [PlantUML](https://github.com/plantuml/plantuml)
+for turning text into a picture, [Structurizr](https://structurizr.com) for treating C4 as a model
+rather than a drawing, [DBML](https://github.com/holistics/dbml) for schema-to-ERD,
+[Graphviz](https://graphviz.org) for deterministic layout, and
+[tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT) for the
+JSON-IR to deterministic SVG to self-contained viewer shape.
+Ideas only — no code from any of them was reused.
 
 <div align="center">
 
