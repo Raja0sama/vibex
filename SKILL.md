@@ -282,8 +282,20 @@ docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo dir]
                   --md also writes the document as Markdown. Re-reads only the anchors
                   git says moved since the commit in the lock file.
 demo [dir]        render examples/ into dir (+ dashboard.html)
+outdated [dir]    which generated files this version would now render differently.
+                  Exits 1 if any is stale, so CI can gate on it.
 types             list types with schema and example paths
 ```
+
+**Never answer from a generated file without checking it first.** Run
+`vibex outdated <dir>`. If it reports anything stale, regenerate from the spec and
+read the new file — a stale artifact and a broken feature look identical to
+whoever opens one, and reasoning from the wrong one wastes everybody's time.
+
+Regenerate; never hand-edit generated HTML to bring it up to date. The file is
+derived from the spec the same way a binary is derived from source, and a
+hand-patched artifact is one no version of this tool would ever have produced.
+If the *spec* is what is wrong, fix the spec and re-render.
 
 YAML OpenAPI needs the optional `yaml` package: run `npm install` inside the skill root once (installed automatically on the `npx vibex` path), or convert the file to JSON.
 

@@ -12,6 +12,7 @@ import { head, dirtyPaths, changedSince, shortSha, prefix as gitPrefix, underPre
 import { readCommits, buildChangelog, resolve as resolveRef, diffClaims } from '../renderers/changelog/from-git.mjs';
 import { changelogToMarkdown } from '../renderers/changelog/to-markdown.mjs';
 import { planCheck, mergeLock, verifiedCommits, emptyLock } from '../renderers/docs/incremental.mjs';
+import { buildFingerprint, readStamp, packageVersion } from '../renderers/shared/stamp.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -41,6 +42,8 @@ Usage:
                                   build a release list from commit history, and — with
                                   --specs — what those commits did to the documentation
   vibex demo [out-dir]          render the bundled examples (+ dashboard.html)
+  vibex outdated [dir]          which generated files this version would now render
+                                differently. Exits 1 if any is stale, so CI can gate on it.
   vibex types                   list diagram types and schema paths
   vibex help                    this text
 
@@ -546,6 +549,60 @@ function cmdTypes() {
   }
 }
 
+// Would this version of vibeX still produce the file sitting on disk?
+//
+// The build fingerprint covers every renderer and every inlined asset, so a fix
+// that only touched viewer.css counts as a reason to regenerate just as much as
+// a version bump does. That is the case worth catching: a stale artifact and a
+// broken feature look identical to whoever opens the file.
+//
+// What it does not answer is whether the *spec* moved. A generated file carries
+// its own spec, but renderers normalise before embedding, so a truthful answer
+// means re-rendering rather than diffing JSON. Reporting that honestly beats
+// reporting it wrongly.
+function cmdOutdated(args) {
+  const json = boolFlag(args, '--json');
+  rejectUnknownFlags(args);
+  const dir = path.resolve(args[0] || 'out');
+  if (!fs.existsSync(dir)) fail(`No such directory: ${args[0] || 'out'}`);
+
+  const files = [];
+  const walk = (d) => {
+    for (const name of fs.readdirSync(d).sort()) {
+      const full = path.join(d, name);
+      const st = fs.statSync(full);
+      if (st.isDirectory()) walk(full);
+      else if (name.endsWith('.html')) files.push(full);
+    }
+  };
+  walk(dir);
+
+  const current = buildFingerprint(root);
+  const version = packageVersion(root);
+  const rows = files.map((file) => {
+    const stamp = readStamp(fs.readFileSync(file, 'utf8'));
+    const rel = path.relative(process.cwd(), file);
+    if (!stamp.stamped) return { file: rel, state: 'unstamped', detail: 'generated before vibeX recorded its build; regenerate to find out' };
+    if (stamp.build !== current) return { file: rel, state: 'stale', version: stamp.version, built: stamp.built, detail: `built by vibex ${stamp.version}; this build renders differently` };
+    return { file: rel, state: 'current', version: stamp.version, built: stamp.built, detail: '' };
+  });
+
+  const behind = rows.filter((r) => r.state !== 'current');
+  if (json) {
+    console.log(JSON.stringify({ version, build: current, checked: rows.length, outdated: behind.length, files: rows }, null, 2));
+  } else if (!rows.length) {
+    console.log(`No .html files in ${path.relative(process.cwd(), dir) || '.'}`);
+  } else {
+    const width = Math.min(60, Math.max(...rows.map((r) => r.file.length)));
+    for (const r of rows) console.log(`${r.file.padEnd(width)}  ${r.state.padEnd(9)} ${r.detail}`);
+    console.log('');
+    console.log(behind.length
+      ? `${behind.length} of ${rows.length} out of date against vibex ${version} (${current}). Regenerate them.`
+      : `All ${rows.length} current against vibex ${version} (${current}).`);
+  }
+  if (behind.length) process.exit(1);
+}
+
 const [command, ...rest] = process.argv.slice(2);
 switch (command) {
   case 'validate': cmdValidate(rest); break;
@@ -555,6 +612,7 @@ switch (command) {
   case 'docs': cmdDocs(rest); break;
   case 'changelog': cmdChangelog(rest); break;
   case 'demo': await cmdDemo(rest); break;
+  case 'outdated': cmdOutdated(rest); break;
   case 'types': cmdTypes(); break;
   case undefined: case 'help': case '-h': case '--help': console.log(HELP); break;
   default: fail(`Unknown command "${command}"\n\n${HELP}`);

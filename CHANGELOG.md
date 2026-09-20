@@ -5,6 +5,8 @@ All notable changes to this project are recorded here. The format follows Keep a
 ## [Unreleased]
 
 ### Added
+- **`vibex outdated <dir>` — which generated files this version would now render differently.** Every generated file records what produced it: `generator` for a person, and a build fingerprint for a machine. The fingerprint covers every renderer and every inlined asset, not just the version, so a fix that only touched `viewer.css` is as detectable as a release. It exits 1 when anything is stale, so CI can gate on it the way it gates on documentation drift.
+  A stale artifact and a broken feature look identical to whoever opens the file; this is how you tell them apart. What it does not answer is whether the *spec* moved — a generated file carries its own spec, but renderers normalise before embedding, so a truthful answer there means re-rendering rather than diffing JSON.
 - **Every panel around the canvas now collapses, and remembers it.** The dashboard index, the right-hand details panel and the notes strip each take a click or a key — `[`, `]` and `\` — and the choice is kept per panel across reloads.
   Collapsing is not hiding. The index keeps its colour dots and its active marker, and the details panel keeps `Details`, `Legend` and `Stats` readable down its edge; clicking one reopens the panel at that section. A reader who wants the diagram wide gets it without losing their way back.
 
