@@ -241,6 +241,68 @@ test('validator: row/col bounds and duplicate cells; renderers survive them anyw
   assert.ok(dup.svg.includes('data-node-id="b"') && !dup.svg.includes('NaN'));
 });
 
+test('c4: a description longer than three lines grows the box instead of spilling out of it', () => {
+  const { renderC4 } = renderersFor('c4');
+  // Greedy wrapping leaves ragged line ends, so a description is measured by
+  // wrapping it, never by dividing its length by the characters that fit.
+  const wordy = 'reconciliation orchestration provisioning authentication observability deduplication reconciliation';
+  const wide = renderC4(c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: wordy }, { id: 'b', kind: 'system', label: 'B', description: 'd' }] }));
+  // Only element a's own group: element b carries a one-line description too.
+  const groupA = wide.svg.slice(wide.svg.indexOf('data-node-id="a"'), wide.svg.indexOf('data-node-id="b"'));
+  const drawn = [...groupA.matchAll(/class="desc"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  assert.equal(drawn.length, 4, 'all four wrapped lines are drawn');
+  assert.ok(!drawn.join(' ').includes('…'), 'nothing was truncated');
+  assert.deepEqual(wide.warnings, [], 'text that fits raises no warning');
+
+  // The invariant that actually matters: every line of text sits inside the box
+  // that was measured for it. Sizing and drawing are two passes, and the bug
+  // this guards against is them disagreeing about how many lines there are.
+  const box = /class="box" x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)"/.exec(groupA);
+  assert.ok(box, 'element a drew a box');
+  const bottom = Number(box[1]) + Number(box[2]);
+  const baselines = [...groupA.matchAll(/<text x="[\d.]+" y="([\d.]+)" class="desc"/g)].map((m) => Number(m[1]));
+  assert.equal(baselines.length, 4, 'four description baselines');
+  assert.ok(Math.max(...baselines) < bottom, `last line at ${Math.max(...baselines)} must sit above the box bottom at ${bottom}`);
+
+  // And the rank stays one height rather than a ragged skyline.
+  const heights = [...wide.svg.matchAll(/class="box"[^>]*height="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(new Set(heights).size, 1, 'every box in the rank shares one height');
+  assert.ok(Math.max(...heights) > Math.max(...[...renderC4(c4()).svg.matchAll(/class="box"[^>]*height="([\d.]+)"/g)].map((m) => Number(m[1]))), 'the rank grew to hold the longer text');
+});
+
+test('c4: rendering is deterministic — the same spec renders identically whatever preceded it', () => {
+  const { renderC4 } = renderersFor('c4');
+  // Box heights are measured in one pass and filled in another. If the line cap
+  // that both passes read were module state, the first render of a process
+  // would size boxes for the wrong number of lines and every render after it
+  // would inherit the previous diagram's cap — which is what a dashboard does.
+  const wordy = c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: 'A deliberately verbose description that needs well over three wrapped lines to say what this container actually does in production every day.' }, { id: 'b', kind: 'system', label: 'B', description: 'd' }] });
+  // The diagram in between needs a different line cap of its own, or a leak
+  // would be handing back the same number by luck.
+  const other = c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: 'reconciliation orchestration provisioning authentication observability deduplication reconciliation' }, { id: 'b', kind: 'system', label: 'B', description: 'd' }] });
+  const first = renderC4(structuredClone(wordy)).svg;
+  renderC4(structuredClone(other));
+  assert.equal(renderC4(structuredClone(wordy)).svg, first, 'an unrelated render in between changes nothing');
+  const alone = renderC4(structuredClone(other)).svg;
+  renderC4(c4());
+  assert.equal(renderC4(structuredClone(other)).svg, alone, 'and neither does a plain one');
+});
+
+test('c4: shortened text is reported, and whitespace alone never counts as shortened', () => {
+  const { renderC4 } = renderersFor('c4');
+  // wrapText collapses runs of whitespace; a newline is not a truncation.
+  const spaced = renderC4(c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: 'Handles  payments\nand refunds.' }, { id: 'b', kind: 'system', label: 'B', description: 'd' }] }));
+  assert.deepEqual(spaced.warnings, [], 'double spaces and newlines are not truncation');
+
+  const long = Array.from({ length: 60 }, (_, i) => `word${i}`).join(' ');
+  const cut = renderC4(c4({
+    elements: [{ id: 'a', kind: 'system', label: 'A', description: long }, { id: 'b', kind: 'system', label: 'B', description: 'd' }],
+    relationships: [{ from: 'a', to: 'b', label: 'a genuinely long edge label that cannot survive two wrapped lines however it is broken up', technology: 'an-extremely-long-technology-name-here' }],
+  }));
+  assert.ok(cut.warnings.some((w) => w.startsWith('description shortened') && w.includes('a')), 'names the element whose description was cut');
+  assert.ok(cut.warnings.some((w) => w.includes('technology') && w.includes('a→b')), 'names the relationship whose label or technology was cut');
+});
+
 test('validator: javascript: links and repository urls are rejected; only http(s) allowed', () => {
   assert.ok(validateSpec(c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: 'd', link: "javascript:document.title='X'" }] })).errors.some((e) => e.code === 'url'));
   const withLink = (link) => c4({ elements: [{ id: 'a', kind: 'system', label: 'A', description: 'd', link }, { id: 'b', kind: 'system', label: 'B', description: 'd' }] });

@@ -11,33 +11,58 @@ const TITLE_PX = 15; const SUB_PX = 10.5; const DESC_PX = 11.5; const DESC_LH = 
 const SHAPE_TOP = { person: 44, database: 30, default: 16 };
 const PAD_BOTTOM = 16;
 const DRILL_H = 20;
+const LABEL_CHARS = 44; const LABEL_LINES = 2;
+const TECH_CHARS = 30;
 
-function descLines(el, w) {
-  return wrapText(el.description || '', fitChars(w - 28, DESC_PX), 3);
+const DESC_LINES_MIN = 3;
+const DESC_LINES_MAX = 5;
+
+// The cap travels as an argument, never as module state: sizing and drawing are
+// two passes over the same spec, and a value left over from the last diagram
+// would size this one's boxes.
+function descLines(el, w, cap) {
+  return wrapText(el.description || '', fitChars(w - 28, DESC_PX), cap);
+}
+
+// How many lines the wordiest description actually needs, bounded. Wrapping is
+// greedy, so the wrap itself is the only honest count — dividing characters by
+// line width assumes a perfect pack and comes up a line short. One verbose
+// element makes the whole rank taller, which is the honest trade: a long
+// description costs height rather than being silently halved.
+function descCap(elements) {
+  let need = DESC_LINES_MIN;
+  for (const el of elements || []) {
+    const text = String(el.description || '').trim();
+    if (!text) continue;
+    const w = el.kind === 'person' ? WIDTH.person : WIDTH.default;
+    need = Math.max(need, wrapText(text, fitChars(w - 28, DESC_PX), DESC_LINES_MAX).length);
+    if (need >= DESC_LINES_MAX) break;
+  }
+  return need;
 }
 
 // Text block: title baseline, stereotype 16px under it, description 19px under
 // that. Returns the height the block needs so boxes can hug their content.
-function blockHeight(el, w) {
-  const lines = descLines(el, w).length;
+function blockHeight(el, w, cap) {
+  const lines = descLines(el, w, cap).length;
   return 15 + 16 + (lines ? 19 + (lines - 1) * DESC_LH + 4 : 0);
 }
 
 // One height for every non-person element keeps a rank looking like a row of
 // cards instead of a ragged skyline.
-function makeSizeOf(elements) {
+function makeSizeOf(elements, cap) {
   let shared = 0;
   for (const el of elements) {
     if (el.kind === 'person') continue;
     const w = WIDTH.default;
     const top = SHAPE_TOP[el.kind] ?? SHAPE_TOP.default;
-    shared = Math.max(shared, top + blockHeight(el, w) + (el.link ? DRILL_H : 0) + PAD_BOTTOM);
+    shared = Math.max(shared, top + blockHeight(el, w, cap) + (el.link ? DRILL_H : 0) + PAD_BOTTOM);
   }
   shared = Math.max(shared, 104);
   return (el) => {
     if (el.kind === 'person') {
       const w = WIDTH.person;
-      const h = SHAPE_TOP.person + blockHeight(el, w) + (el.link ? DRILL_H : 0) + PAD_BOTTOM;
+      const h = SHAPE_TOP.person + blockHeight(el, w, cap) + (el.link ? DRILL_H : 0) + PAD_BOTTOM;
       return { w, h: Math.max(h, 128) };
     }
     return { w: WIDTH.default, h: shared };
@@ -98,7 +123,7 @@ function autoRows(spec) {
   }));
 }
 
-function renderElement(el, rect) {
+function renderElement(el, rect, cap) {
   const { x, y, w, h } = rect;
   const kind = el.kind;
   const cls = `node c4 ${kind}${el.external ? ' external' : ''}`;
@@ -136,10 +161,10 @@ function renderElement(el, rect) {
 
   // Centre the text block in the room left between the shape top and the
   // bottom padding, so a one-line description does not leave a void.
-  const lines = descLines(el, w);
+  const lines = descLines(el, w, cap);
   const drill = el.link ? DRILL_H : 0;
   const avail = (y + h - PAD_BOTTOM - drill) - textTop;
-  const top = textTop + Math.max(0, (avail - blockHeight(el, w)) / 2);
+  const top = textTop + Math.max(0, (avail - blockHeight(el, w, cap)) / 2);
 
   out += svgText(cx, top + 15, truncate(el.label, fitChars(w - 24, TITLE_PX)), { cls: 'title', anchor: 'middle' });
   const stereo = `[${kind === 'person' ? 'Person' : kind[0].toUpperCase() + kind.slice(1)}${el.technology ? `: ${el.technology}` : ''}${el.external ? ', external' : ''}]`;
@@ -186,8 +211,10 @@ function renderRelationship(rel, index, rects, offset, obstacles) {
   edge += `<path class="line" d="${d}" marker-end="url(#m-arrow)"${rel.direction === 'both' ? ' marker-start="url(#m-arrow)"' : ''}/>`;
   edge += '</g>';
   const lines = [];
-  if (rel.label) lines.push({ text: truncate(rel.label, 40), tech: false });
-  if (rel.technology) lines.push({ text: `[${truncate(rel.technology, 30)}]`, tech: true });
+  // The label box is sized from its text, so nothing forced the old 40-char
+  // cap; it just threw the rest away. Wrap instead, two lines at most.
+  for (const t of wrapText(rel.label || '', LABEL_CHARS, LABEL_LINES)) lines.push({ text: t, tech: false });
+  if (rel.technology) lines.push({ text: `[${truncate(rel.technology, TECH_CHARS)}]`, tech: true });
   let labelSvg = '';
   if (lines.length) {
     const widest = Math.max(...lines.map((l) => textWidth(l.text, l.tech ? 10.5 : 11.5)));
@@ -217,17 +244,38 @@ export function renderC4(spec) {
   const rows = autoRows(spec);
   // Many ranks read better left-to-right on a landscape screen.
   const direction = layout.direction === 'lr' || layout.direction === 'tb' ? layout.direction : (rows.length > 4 ? 'lr' : 'tb');
+  // Before placement: sizeOf measures boxes from this, renderElement fills them
+  // from this, and the two have to agree or the text spills out of the box.
+  const descCapLines = descCap(spec.elements);
   const placement = rowsPlace(rows, {
     direction,
     gapX: num(layout.gapX, direction === 'lr' ? 100 : 70) + (hasBoundaries ? BOUNDARY_PAD : 0),
     gapY: num(layout.gapY, direction === 'lr' ? 50 : 80) + (hasBoundaries ? BOUNDARY_PAD + BOUNDARY_LABEL_H : 0),
     originX: MARGIN + (hasBoundaries ? BOUNDARY_PAD * 2 : 0),
     originY: MARGIN + (hasBoundaries ? (BOUNDARY_PAD + BOUNDARY_LABEL_H) * 2 : 0),
-    sizeOf: makeSizeOf(spec.elements),
+    sizeOf: makeSizeOf(spec.elements, descCapLines),
     align: hasBoundaries ? 'left' : 'center',
   });
   const rects = placement.placed;
   const warnings = [];
+
+  // Silence is the failure mode this project exists to avoid: if text did not
+  // fit, say which text, and where the whole of it can still be read.
+  // wrapText collapses runs of whitespace, so both sides are normalised before
+  // they are compared — otherwise a description with a newline in it reads as
+  // shortened when every word of it survived.
+  const norm = (text) => String(text ?? '').trim().split(/\s+/).filter(Boolean).join(' ');
+  const wasCut = (full, lines) => Boolean(norm(full)) && lines.join(' ') !== norm(full);
+  const cutDesc = (spec.elements || []).filter((el) => {
+    const w = el.kind === 'person' ? WIDTH.person : WIDTH.default;
+    return wasCut(el.description, descLines(el, w, descCapLines));
+  }).map((el) => el.id);
+  const cutLabel = (spec.relationships || []).filter((r) => (
+    wasCut(r.label, wrapText(r.label || '', LABEL_CHARS, LABEL_LINES))
+    || wasCut(r.technology, [truncate(norm(r.technology), TECH_CHARS)])
+  )).map((r) => `${r.from}→${r.to}`);
+  if (cutDesc.length) warnings.push(`description shortened to fit on ${cutDesc.length} element(s): ${cutDesc.slice(0, 6).join(', ')}${cutDesc.length > 6 ? ', …' : ''} — the full text is in the node tooltip and the details panel`);
+  if (cutLabel.length) warnings.push(`edge label or technology shortened to fit on ${cutLabel.length} relationship(s): ${cutLabel.slice(0, 4).join(', ')}${cutLabel.length > 4 ? ', …' : ''} — the full text is in the edge tooltip`);
 
   // Boundaries: compute nested first (depth-first), outermost gets the most padding.
   const byId = new Map(boundaries.map((b) => [b.id, b]));
@@ -294,7 +342,7 @@ export function renderC4(spec) {
   const labelSize = (r) => ((r.label || '').length + (r.technology || '').length);
   const order = rels.map((_, i) => i).sort((a, b) => labelSize(rels[b]) - labelSize(rels[a]));
   for (const i of order) { const r = renderRelationship(rels[i], i, rects, offsets[i], obstacles); body += r.edge; labels += r.labelSvg; }
-  for (const e of spec.elements) body += renderElement(e, rects.get(e.id));
+  for (const e of spec.elements) body += renderElement(e, rects.get(e.id), descCapLines);
   body += labels;
 
   const everything = [...rects.values(), ...[...boundaryRects.values()].filter(Boolean)];
