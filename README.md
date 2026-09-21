@@ -286,7 +286,7 @@ as a rough sort, not as the author's intent."*
 
 ---
 
-## The security review is one sentence long
+## Nothing leaves the machine
 
 An architecture diagram is a reconnaissance map of your system — table names, service
 topology, auth boundaries, every internal route. It's the exact thing you can't paste
@@ -311,7 +311,7 @@ Hand it to a contractor, an auditor, or the new hire on their first morning. It'
 </details>
 
 <details>
-<summary><b>A viewer, not a picture</b> — shortcuts, deep links, source links, export</summary>
+<summary><b>Viewer shortcuts</b> — search, deep links, source links, export</summary>
 
 <br>
 

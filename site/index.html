@@ -229,45 +229,10 @@ section{padding-block:clamp(56px,8vw,96px) 0}
 .term .gap{height:10px}
 
 /* ---------- private ---------- */
-.private{margin-top:clamp(40px,6vw,56px);border-top:1px solid var(--chip);background:var(--band);padding:clamp(56px,8vw,96px) 0}
-.private h2{max-width:860px;margin-top:22px;font-family:var(--mono);font-size:clamp(26px,5vw,42px);font-weight:700;line-height:1.22;letter-spacing:-.035em}
-.private p{max-width:660px;margin-top:20px;font-size:clamp(16px,2.2vw,17.5px);line-height:1.62;color:var(--text-2)}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(28px,4vw,52px);margin-top:52px}
-.cols h3{font-size:16px;font-weight:600}
-.checks{margin-top:20px;display:flex;flex-direction:column;gap:14px}
-.checks li{display:flex;gap:12px;font-size:15px;line-height:1.55;color:var(--text-2)}
-.checks svg{width:15px;height:15px;flex:none;margin-top:4px;color:var(--ep)}
-.checks code{font-size:13.5px;color:var(--text)}
 .chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
 .chips span{padding:8px 14px;background:var(--chip);border:1px solid var(--border);border-radius:7px;font-family:var(--mono);font-size:13px;color:var(--text-2)}
-.quote{margin-top:28px;padding:22px 24px;background:var(--ground);border:1px solid var(--border);border-left:3px solid var(--ep);border-radius:10px}
-.quote p{margin:0;font-size:17px;font-weight:500;color:var(--text)}
-.quote p+p{margin-top:7px;font-size:15px;font-weight:400;color:var(--text-3)}
 
 /* ---------- viewer features ---------- */
-.feat{padding:22px 24px;background:var(--card);border:1px solid var(--border);border-radius:11px}
-.feat h3{font-size:15.5px;font-weight:600}
-.feat p{margin-top:8px;font-size:14px;line-height:1.55;color:var(--text-3)}
-.dash{margin-top:40px;display:grid;grid-template-columns:238px minmax(0,1fr);border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--card)}
-.dash-side{background:var(--band);border-right:1px solid var(--border);padding:14px 10px}
-.dash-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 14px;border-bottom:1px solid var(--border)}
-.dash-brand .tile{background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
-.dash-brand b{display:block;font-size:12.5px;font-weight:650}
-.dash-brand i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3)}
-.dash-h{display:block;padding:14px 8px 6px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.09em;color:var(--text-4)}
-.dash-i{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:12.5px;color:var(--text-2)}
-.dash-i .d{width:7px;height:7px;border-radius:50%;flex:none}
-.dash-i em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:10px;color:var(--text-4)}
-.dash-i.on{background:var(--chip);color:var(--text);font-weight:600}
-.dash-main{padding:clamp(18px,3vw,26px)}
-.dash-claim{padding:14px 16px;border:1px solid var(--border);border-radius:9px;margin-bottom:10px;background:var(--ground)}
-.dash-claim p{font-size:13.5px;line-height:1.55;color:var(--text)}
-.dash-claim p b{font-family:var(--mono);font-size:12.5px;font-weight:400}
-.dash-claim code{font-size:12px;color:var(--text-2)}
-.dash-claim .src{display:block;margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
-.dash-claim.dim{opacity:.72}
-.dash-cov{margin-top:14px;padding:12px 16px;border:1px dashed var(--border-2);border-radius:9px;font-size:12px;line-height:1.5;color:var(--text-3)}
-@media (max-width:760px){.dash{grid-template-columns:minmax(0,1fr)}.dash-side{border-right:none;border-bottom:1px solid var(--border)}}
 .flow{margin-top:40px;padding:14px;background:var(--band);border:1px solid var(--border);border-radius:13px;overflow-x:auto}
 .flow svg{display:block;min-width:820px;width:100%;height:auto}
 .soon{padding:clamp(28px,4vw,44px);border:1px dashed var(--border-2);border-radius:15px;background:var(--band)}
@@ -340,7 +305,6 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
       <a href="#how">How it works</a>
       <a href="#loop">Intake</a>
       <a href="#next">Next</a>
-      <a href="#private">Private</a>
       <a href="/start">Getting started</a>
     </nav>
     <div class="tools">
@@ -865,83 +829,6 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
     </div>
   </section>
 
-  <div class="private" id="private">
-    <div class="wrap">
-      <p class="eyebrow" style="color:var(--ep);display:flex;align-items:center;gap:11px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:21px;height:21px" aria-hidden="true"><path d="M12 3l7.5 3v5.6c0 4.3-3.1 8.2-7.5 9.4-4.4-1.2-7.5-5.1-7.5-9.4V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>
-        PRIVATE BY DEFAULT
-      </p>
-      <h2>The security review is one sentence long.</h2>
-      <p>An architecture diagram is a reconnaissance map of your system — table names, service topology, auth boundaries, every internal route. It is the exact thing you cannot paste into someone else's SaaS.</p>
-      <p>So vibeX doesn't have a server. No vendor, no DPA, no subprocessor list, no questionnaire. There is nothing to review, because there is nowhere for it to go.</p>
-      <div class="cols">
-        <div>
-          <h3>What the generated file does not do</h3>
-          <ul class="checks">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg><span>No <code>fetch</code>, <code>XMLHttpRequest</code> or WebSocket, anywhere in the viewer runtime</span></li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg><span>No CDN, no web fonts, no analytics, no telemetry — the system font stack and nothing else</span></li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg><span>PNG export renders through an in-memory blob; it never touches the network</span></li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg><span>Pull the cable out of the wall and it still pans, zooms, searches and exports</span></li>
-          </ul>
-        </div>
-        <div>
-          <h3>Put it wherever you keep things</h3>
-          <div class="chips">
-            <span>S3 behind SSO</span><span>internal nginx</span><span>private Pages</span>
-            <span>Confluence attachment</span><span>committed next to the code</span><span>file://</span>
-          </div>
-          <div class="quote">
-            <p>No account to view it. No seats. No expiry.</p>
-            <p>Hand it to a contractor, an auditor, or the new hire on their first morning. It's a file.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <section class="wrap" id="dashboard">
-    <p class="eyebrow">ONE FILE</p>
-    <h2 class="sec" style="margin-top:16px">Six panels, one dashboard, no server</h2>
-    <p class="lead" style="max-width:700px">Point <code style="color:var(--text)">vibex dashboard</code> at the folder. Every spec in it becomes a panel, documentation leads the sidebar, changes close it, and the whole thing is a single HTML file you can email.</p>
-
-    <div class="dash">
-      <div class="dash-side">
-        <div class="dash-brand">
-          <span class="tile" style="width:26px;height:26px;border-radius:7px"><svg viewBox="0 0 24 24" style="width:15px;height:15px"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.5H10.5V18.5H19.5"/><path d="M4.5 18.5H13.5V5.5H19.5"/></g><g fill="currentColor"><circle cx="4.5" cy="5.5" r="2.1"/><circle cx="19.5" cy="5.5" r="2.1"/><circle cx="4.5" cy="18.5" r="2.1"/><circle cx="19.5" cy="18.5" r="2.1"/></g></svg></span>
-          <span><b>Relay</b><i>A parcel network</i></span>
-        </div>
-        <span class="dash-h">OVERVIEW</span>
-        <a class="dash-i"><span class="d" style="background:var(--text-4)"></span>Overview</a>
-        <span class="dash-h">DOCUMENTATION</span>
-        <a class="dash-i on"><span class="d" style="background:var(--ep)"></span>Relay, end to end<em>41</em></a>
-        <a class="dash-i"><span class="d" style="background:var(--ep)"></span>Tracking<em>18</em></a>
-        <span class="dash-h">DIAGRAMS</span>
-        <a class="dash-i"><span class="d" style="background:var(--lc)"></span>relay.erd<em>12</em></a>
-        <a class="dash-i"><span class="d" style="background:var(--c4)"></span>relay.c4<em>9</em></a>
-        <a class="dash-i"><span class="d" style="background:var(--ep)"></span>relay.endpoints<em>25</em></a>
-        <a class="dash-i"><span class="d" style="background:var(--c4)"></span>parcel.lifecycle<em>7</em></a>
-        <span class="dash-h">HISTORY</span>
-        <a class="dash-i"><span class="d" style="background:var(--erd)"></span>Changes<em>5</em></a>
-      </div>
-      <div class="dash-main">
-        <div class="dash-claim">
-          <p><span class="pip" style="background:var(--ep)"></span>A parcel cannot leave <b>in_transit</b> without a scan event, enforced by the guard in <code>dispatch/src/parcel.state.ts</code>.</p>
-          <span class="src">verified &middot; anchored to parcel.state.ts:88</span>
-        </div>
-        <div class="dash-claim">
-          <p><span class="pip" style="background:var(--erd)"></span>Refunds above 500 are settled manually. Decided after the March incident.</p>
-          <span class="src">stated by Raja on 2026-03-14</span>
-        </div>
-        <div class="dash-claim dim">
-          <p><span class="pip" style="background:var(--lc)"></span>The dispatch worker retries a failed scan three times before parking it.</p>
-          <span class="src">needs re-reading &middot; worker.ts moved in 7b9a7d4</span>
-        </div>
-        <div class="dash-cov">Coverage &mdash; 8 of 25 endpoint subjects carry no claim. Nothing is documented about Shipment, Parcel, TrackingEvent&hellip;</div>
-      </div>
-    </div>
-    <p class="shot-cap">A trust bar and a &ldquo;needs attention&rdquo; list sit in the side panel; a subject chip on each claim jumps to that node in its diagram.</p>
-  </section>
-
   <section class="wrap" id="next">
     <p class="eyebrow">NEXT</p>
     <h2 class="sec" style="margin-top:16px">Built for one service. Going to a system of them.</h2>
@@ -1068,19 +955,6 @@ kbd{font-size:12px;background:var(--chip);border:1px solid var(--border);border-
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px" aria-hidden="true"><path d="M4 12h14"/><path d="M13 7l5 5-5 5"/></svg>
         </a>
       </div>
-    </div>
-  </section>
-
-  <section class="wrap">
-    <h2 class="sec">A viewer, not a picture</h2>
-    <p class="lead">A PNG of a 40-table schema is a wall. This one you can actually interrogate.</p>
-    <div class="grid3">
-      <div class="feat"><h3>Pan, zoom, fit</h3><p>Big diagrams stay navigable instead of collapsing into grey soup.</p></div>
-      <div class="feat"><h3>Search everything</h3><p>Press <kbd>/</kbd> and find any table, route or state by name.</p></div>
-      <div class="feat"><h3>Deep links</h3><p>Send someone one specific table in one specific diagram, not &ldquo;it's in the doc somewhere&rdquo;.</p></div>
-      <div class="feat"><h3>Jump to source</h3><p>Every node links back to the exact file and line on GitHub or GitLab.</p></div>
-      <div class="feat"><h3>Dark and light</h3><p>Press <kbd>t</kbd>. Exports keep whichever theme you're in.</p></div>
-      <div class="feat"><h3>SVG and PNG export</h3><p>Standalone files, for the slide deck nobody warned you about.</p></div>
     </div>
   </section>
 
