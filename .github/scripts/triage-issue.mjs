@@ -8,7 +8,7 @@ import { parseIntake, triage, PLAYBOOK, ACTIONS } from '../../renderers/shared/t
 import { buildGraph, specId } from '../../renderers/docs/graph.mjs';
 import { validateSpec, DIAGRAM_TYPES } from '../../renderers/shared/validate.mjs';
 
-const dir = process.argv[2] || 'showcase';
+const dir = process.argv[2] || 'examples';
 const body = process.env.ISSUE_BODY || '';
 const labels = (process.env.ISSUE_LABELS || '').split(',').map((l) => l.trim()).filter(Boolean);
 

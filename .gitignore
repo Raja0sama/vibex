@@ -2,8 +2,6 @@ node_modules/
 out/
 *.html
 !assets/*.html
-!site/*.html
-site/demo/
 *.tgz
 .DS_Store
 .claude/
@@ -12,6 +10,7 @@ content/
 # Generated docs artefacts (docs.lock.json IS committed — it is the record)
 docs.json
 changelog.json
-# ...except the showcase's, which is a fixture describing a fictional release
-# of a fictional company, not a build artefact of this repository.
-!showcase/changelog.json
+
+# The landing page and the Relay showcase are their own repository
+# (Raja0sama/vibex-website), checked out here for convenience.
+website/

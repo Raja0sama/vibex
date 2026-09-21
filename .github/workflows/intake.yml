@@ -29,7 +29,7 @@ jobs:
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
-        run: node .github/scripts/triage-issue.mjs showcase
+        run: node .github/scripts/triage-issue.mjs examples
 
       - name: say what happens next
         if: steps.decide.outputs.reply != ''

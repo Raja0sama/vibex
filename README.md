@@ -161,9 +161,9 @@ git clone https://github.com/Raja0sama/vibex && cd vibex
 ln -s "$(pwd)" ~/.claude/skills/vibex
 ```
 
-`skills add` clones the repository rather than the npm package, so it brings the site and
-the showcase with it, and it has no `node_modules` — run `npm install` inside the skill
-folder if you need YAML OpenAPI. The npm paths above already have it.
+`skills add` clones the repository rather than the npm package, and it has no
+`node_modules` — run `npm install` inside the skill folder if you need YAML OpenAPI.
+The npm paths above already have it.
 
 </details>
 
@@ -337,7 +337,6 @@ line on GitHub or GitLab.
 bin/vibex.mjs            CLI: validate, render, import, dashboard, docs, changelog, demo, types
 schemas/                 JSON Schema per type (the authoring contract)
 examples/                one example spec per type
-showcase/                the public demo: a whole system, documented end to end
 renderers/<type>/        JSON -> SVG body
 renderers/docs/          claim graph, anchors, markdown export
 renderers/shared/        validate, layout (grid, orthogonal routing, edge lanes), svg styles, template, dashboard
@@ -345,9 +344,7 @@ importers/               openapi, graphql (own SDL parser), prisma
 assets/template.html     single-diagram shell; slots are <!-- VIBEX:* --> comments
 assets/dashboard.html    multi-diagram shell: sidebar, overview, cross-links
 assets/viewer.js|css     shared viewer runtime, inlined into both shells
-assets/icon.svg          the mark (monochrome, currentColor) · favicon.svg is the tile version
-site/                    the landing page (deployed by Vercel)
-scripts/build-site.mjs   the one build command — Vercel and CI both run it
+assets/icon.svg          the mark (monochrome, currentColor)
 test/                    node:test suite + fixtures
 SKILL.md                 agent instructions (Claude Code / Cursor skill)
 ```

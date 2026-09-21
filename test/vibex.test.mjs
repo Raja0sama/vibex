@@ -1257,13 +1257,11 @@ test('layout: no edge label is drawn on top of a node, in any diagram we ship', 
 
   const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-  const specs = [
-    ...DIAGRAM_EXAMPLES.map((n) => `examples/${n}`),
-    ...fs.readdirSync(path.join(root, 'showcase'))
-      .filter((f) => /\.(erd|c4|endpoints|lifecycle)\.json$/.test(f))
-      .map((f) => `showcase/${f}`),
-  ];
-  assert.ok(specs.length >= 10, `expected the showcase to be wide, saw ${specs.length}`);
+  // The wide diagrams that used to stress this live in the website repository
+  // now, which runs the same check over the rendered showcase. What ships in
+  // the package is what has to hold here.
+  const specs = DIAGRAM_EXAMPLES.map((n) => `examples/${n}`);
+  assert.ok(specs.length >= 4, `expected one example per diagram type, saw ${specs.length}`);
 
   for (const file of specs) {
     const { html, report } = renderSpec(json(file));

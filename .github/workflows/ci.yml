@@ -67,15 +67,6 @@ jobs:
             exit 1
           fi
 
-      # The showcase is published publicly, so it is held to the same bar.
-      - name: the public showcase must hold too
-        run: |
-          status=0
-          for spec in showcase/*.docs.json; do
-            node bin/vibex.mjs docs "$spec" showcase --repo showcase --check --no-lock -o /dev/null || status=1
-          done
-          [ $status -eq 0 ] || { echo "::error::the published demo contains a claim that no longer holds"; exit 1; }
-
       - name: the markdown copy must stay free of raw HTML
         run: |
           node bin/vibex.mjs docs examples/auth.docs.json examples \
