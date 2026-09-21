@@ -6,6 +6,22 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 Nothing yet.
 
+## [0.4.0] - 2026-09-21
+
+C4 boxes are sized for the text they actually hold. Existing specs render at
+different heights and edge labels that used to be cut now wrap, so this
+changes what a generated file contains.
+
+### Fixed
+- **A C4 description longer than three lines was silently halved.** The cap is now measured by wrapping the wordiest description in the spec, bounded at five lines, and the whole rank grows to hold it.
+  Greedy wrapping leaves ragged line ends, so dividing a description's length by the characters that fit comes up a line short — the wrap itself is the only honest count. One verbose element makes every box in the rank taller. That is the trade worth making: a long description costs height rather than quietly losing half of itself.
+- **A dashboard could size a diagram's boxes from the previous diagram's text.** Sizing and drawing are two passes over the same spec, and the line cap they both read was module state. It travels as an argument now, so many renders in one process cannot interfere — the failure mode being boxes measured for three lines holding five.
+- **Edge labels were truncated at 40 characters.** The label box was always sized from its own text, so nothing forced that cap; it just threw the rest away. Labels wrap to two lines instead.
+
+### Added
+- **A render says when text did not fit, and names what was cut.** The warning gives the element ids or the `from→to` of the relationships affected, and points at the tooltip and details panel where the full text is still readable.
+  Silence is the failure mode this project exists to avoid. Whitespace is normalised on both sides before the comparison, so a description containing a newline no longer reports as shortened when every word of it survived.
+
 ## [0.3.1] - 2026-09-20
 
 Install instructions only. No change to the CLI, the renderers, or anything a
