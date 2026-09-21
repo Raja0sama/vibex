@@ -27,6 +27,7 @@ jobs:
       - name: the demo CTAs must resolve
         run: |
           test -f site/index.html
+          test -f site/start.html
           test -f site/favicon.svg
           test -f site/demo/dashboard.html
           test -f site/demo/relay.md
