@@ -1308,12 +1308,12 @@ test('layout: no edge label is drawn on top of a node, in any diagram we ship', 
   // The SVG carries absolute coordinates, so this needs no browser: pull the
   // rects straight out and check them against each other.
   const attr = (tag, name) => {
-    const m = new RegExp(`\\\\b${name}="(-?[\\\\d.]+)"`).exec(tag);
+    const m = new RegExp(`\\b${name}="(-?[\\d.]+)"`).exec(tag);
     return m ? Number(m[1]) : null;
   };
   const rects = (svg, cls) => [...svg.matchAll(/<rect\b[^>]*>/g)]
     .map((m) => m[0])
-    .filter((tag) => new RegExp(`class="[^"]*\\\\b${cls}\\\\b`).test(tag))
+    .filter((tag) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(tag))
     .map((tag) => ({ x: attr(tag, 'x'), y: attr(tag, 'y'), w: attr(tag, 'width'), h: attr(tag, 'height') }))
     .filter((r) => r.x !== null && r.w);
 
@@ -1325,13 +1325,21 @@ test('layout: no edge label is drawn on top of a node, in any diagram we ship', 
   const specs = DIAGRAM_EXAMPLES.map((n) => `examples/${n}`);
   assert.ok(specs.length >= 4, `expected one example per diagram type, saw ${specs.length}`);
 
+  // The shell puts its own icons in the document before the diagram, so the
+  // first <svg> is a 16x16 sun, not the drawing. Slicing from it found no
+  // nodes and no labels, and this test reported clean without looking at
+  // anything. Select the diagram by the class the renderer puts on it.
+  let checkedBoxes = 0;
   for (const file of specs) {
     const { html, report } = renderSpec(json(file));
     assert.ok(report.ok, `${file} does not validate`);
-    const svg = html.slice(html.indexOf('<svg'), html.indexOf('</svg>'));
+    const open = /<svg[^>]*\bclass="vibex\b[^"]*"[^>]*>/.exec(html);
+    assert.ok(open, `${file}: no diagram <svg> in the rendered page`);
+    const svg = html.slice(open.index, html.lastIndexOf('</svg>'));
 
     const boxes = rects(svg, 'box');
     const labels = rects(svg, 'label-bg');
+    checkedBoxes += boxes.length;
     if (!labels.length) continue;
 
     const onBox = labels.filter((l) => boxes.some((b) => hit(l, b)));
@@ -1340,6 +1348,9 @@ test('layout: no edge label is drawn on top of a node, in any diagram we ship', 
     const onLabel = labels.filter((a, i) => labels.some((b, j) => j !== i && hit(a, b)));
     assert.equal(onLabel.length, 0, `${file}: ${onLabel.length} labels overlap each other`);
   }
+
+  // A check that finds nothing to check is not a passing check.
+  assert.ok(checkedBoxes > 0, 'no nodes were examined — the test is reading the wrong SVG again');
 });
 
 test('layout: the least-bad position is chosen when every candidate collides', () => {
