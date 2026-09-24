@@ -3,7 +3,7 @@ name: vibex
 description: Generate ERD (entity-relationship), C4 (context/container/component), API endpoint catalogue, and lifecycle/state-machine diagrams as a validated JSON spec plus a standalone interactive HTML viewer. Imports OpenAPI, GraphQL SDL, and Prisma schemas directly; when no spec file exists, reads the code (NestJS controllers/resolvers, TypeORM/Prisma entities) and authors the JSON by hand. Use when the user asks for a database diagram, ERD, data model, table relationships, C4 diagram, system context, container or component diagram, API map, endpoint list, route overview, GraphQL operation overview, "show me the endpoints", status flow, state machine, lifecycle, allowed transitions, or "what happens after X is approved". Also writes the system's documentation as a checkable fact graph — every statement carries its source and a computed confidence, and a drift check fails CI when the code moves underneath it. Use when the user asks to document a system, write architecture docs, produce an onboarding or handover document, explain how a system works, or build context other agents can read.
 license: MIT
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   cli: node bin/vibex.mjs
   repository: https://github.com/Raja0sama/vibex
 ---

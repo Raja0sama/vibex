@@ -4,6 +4,15 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.5.0] - 2026-09-24
+
+Anchored claims on Python, YAML, Makefiles and any file type not known to be
+whitespace-insensitive are hashed with indentation kept. Existing claims on
+those files read `stale` once after upgrading, so a docs drift check in CI
+will fail until each one is re-read and re-anchored.
+
 ### Fixed
 - **An anchored claim on Python or YAML verified after its code changed meaning.** The anchor hash collapsed all whitespace, so moving a `return` out of an `if`, or re-nesting a YAML key under a sibling, left the hash identical and the claim `verified`.
   The whitespace-insensitive hash now applies only to an explicit list of languages where whitespace is not syntax. Everything else, including any extension not on that list, keeps leading indentation and ignores only trailing whitespace, line endings and trailing blank lines. An existing claim on such a file goes `stale` once: re-read it, then `--reanchor`. A lock written by an earlier version is re-checked rather than trusted.
