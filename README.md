@@ -201,7 +201,7 @@ read it once, arithmetic keeps it honest.**
 | Source | What holds it up |
 |---|---|
 | `derived` | Computed from a diagram spec by one of ten fixed generators. Cannot disagree with the diagram beside it, because it *is* the diagram. |
-| `anchored` | Prose pinned to a file and a symbol by a content hash. Whitespace-insensitive — reformat the file and nothing moves; change the line and the claim flags itself. |
+| `anchored` | Prose pinned to a file and a symbol by a content hash. In languages where whitespace is not syntax (TypeScript, JSON, Go, …) the hash ignores it — reformat the file and nothing moves; change the line and the claim flags itself. Everywhere else (Python, YAML, Makefiles, any unknown extension) indentation counts, and only trailing whitespace and line endings are ignored. |
 | `asserted` | A person's decision, with their name and the date. For what no file can prove — and it expires, so "we decided this in March" can't pass for fact forever. |
 
 **Confidence is computed, never written.** A claim cannot declare how trustworthy it is.

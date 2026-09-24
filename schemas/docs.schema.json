@@ -235,7 +235,11 @@
         "hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{12}$",
-          "description": "First 12 hex chars of the SHA-256 of the anchored region: the selected lines (whole file when line is absent), each line's whitespace runs collapsed to one space and trimmed, joined with \\n. Whitespace-insensitive so a reformat does not cry wolf, content-sensitive so a real edit does."
+          "description": "First 12 hex chars of the SHA-256 of the anchored region: the selected lines (whole file when line is absent), normalised per hash_mode and joined with \\n. loose: each line's whitespace runs collapsed to one space and trimmed, so a reformat does not cry wolf. exact: leading indentation kept, only trailing whitespace, line endings and trailing blank lines ignored, so re-nesting a line in Python or YAML is caught."
+        },
+        "hash_mode": {
+          "enum": ["exact", "loose"],
+          "description": "Overrides the per-extension default. Loose only for known whitespace-insensitive languages (TypeScript, JavaScript, JSON, Java, Go, Rust, C-family, SQL, GraphQL, Prisma, CSS...); everything else, including every unknown extension, is exact. vibex validate warns when loose is set on a file where indentation is syntax."
         }
       }
     },

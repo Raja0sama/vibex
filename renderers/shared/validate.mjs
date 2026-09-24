@@ -3,6 +3,8 @@
 // which is what actually breaks a render. Schemas in /schemas stay the
 // human-readable contract.
 
+import { isWhitespaceSignificant } from '../docs/hash-mode.mjs';
+
 const ID_RE = /^[a-zA-Z][a-zA-Z0-9_.-]*$/;
 
 export const ENUMS = {
@@ -30,6 +32,7 @@ export const ENUMS = {
   },
   docs: {
     sourceKind: ['anchored', 'asserted'],
+    hashMode: ['exact', 'loose'],
     generator: [
       'erd.entities', 'erd.relationships',
       'c4.elements', 'c4.relationships', 'c4.boundaries',
@@ -483,6 +486,10 @@ function checkClaimSource(report, src, at) {
     }
     if (Number.isInteger(src.line) && Number.isInteger(src.end_line) && src.end_line < src.line) {
       report.error('range', `${at}.source.end_line is before line`, at);
+    }
+    if (src.hash_mode !== undefined) checkEnum(report, src.hash_mode, ENUMS.docs.hashMode, `${at}.source.hash_mode`, false);
+    if (src.hash_mode === 'loose' && isWhitespaceSignificant(src.path)) {
+      report.warn('loose-hash', `${at}.source.hash_mode is "loose" on ${src.path}, where indentation is syntax: re-nesting a line will not flag this claim. Drop the override unless the anchored lines cannot change meaning by indentation.`, at);
     }
   } else if (src.kind === 'asserted') {
     if (typeof src.by !== 'string' || !src.by.trim()) report.error('missing', `${at}.source.by is required: name who stands behind this`, at);

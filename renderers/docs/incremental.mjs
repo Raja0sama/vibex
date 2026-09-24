@@ -5,6 +5,8 @@
 // where reuse is provably safe. Every uncertainty resolves toward re-checking:
 // a stale "verified" is the one output this feature cannot afford.
 
+import { hashModeFor } from './hash-mode.mjs';
+
 export const LOCK_ARTIFACT = 'docs-lock';
 
 export function emptyLock() {
@@ -37,6 +39,8 @@ export function planCheck({ claims, lock, commit, changed, dirty }) {
     if (!prev) { recheck.add(c.id); continue; }
     // The spec itself may have been re-anchored or rewritten since the lock.
     if (prev.hash !== c.source.hash) { recheck.add(c.id); continue; }
+    // A lock written before modes existed hashed everything loose.
+    if ((prev.mode ?? 'loose') !== hashModeFor(c.source)) { recheck.add(c.id); continue; }
     if (touched.has(c.source.path)) { recheck.add(c.id); continue; }
     // A claim that did not verify last time is re-checked until it does, so a
     // problem cannot go quiet just because nobody touched the file.
@@ -66,6 +70,7 @@ export function mergeLock({ claims, lock, statuses, commit, now = Date.now() }) 
     next.claims[c.id] = {
       state: st.state,
       hash: c.source.hash,
+      mode: hashModeFor(c.source),
       // The commit a claim last verified at is provenance in time: it survives
       // builds where the claim was reused rather than re-read.
       commit: st.state === 'match' ? (st.commit || commit || null) : (prev?.commit ?? null),

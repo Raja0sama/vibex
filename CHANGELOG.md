@@ -4,7 +4,12 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+- **An anchored claim on Python or YAML verified after its code changed meaning.** The anchor hash collapsed all whitespace, so moving a `return` out of an `if`, or re-nesting a YAML key under a sibling, left the hash identical and the claim `verified`.
+  The whitespace-insensitive hash now applies only to an explicit list of languages where whitespace is not syntax. Everything else, including any extension not on that list, keeps leading indentation and ignores only trailing whitespace, line endings and trailing blank lines. An existing claim on such a file goes `stale` once: re-read it, then `--reanchor`. A lock written by an earlier version is re-checked rather than trusted.
+
+### Added
+- **`source.hash_mode: "exact" | "loose"`** overrides the per-extension default. `vibex validate` warns (`loose-hash`) when it is set to `loose` on a file where indentation is syntax.
 
 ## [0.4.0] - 2026-09-21
 
