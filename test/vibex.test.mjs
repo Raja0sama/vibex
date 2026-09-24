@@ -10,7 +10,7 @@ import { importGraphql, parseSdl } from '../importers/graphql.mjs';
 import { importPrisma } from '../importers/prisma.mjs';
 import { renderDashboard } from '../renderers/shared/dashboard.mjs';
 import { channelOffsets, routeOrthogonal, placeLabel, overlapArea } from '../renderers/shared/layout.mjs';
-import { hashRegion, checkAnchor } from '../renderers/docs/anchors.mjs';
+import { hashRegion, checkAnchor, hashModeFor } from '../renderers/docs/anchors.mjs';
 import { buildGraph } from '../renderers/docs/graph.mjs';
 import { runGenerator } from '../renderers/docs/facts.mjs';
 import { renderDocsPanel } from '../renderers/docs/render-docs.mjs';
@@ -560,6 +560,58 @@ test('anchors: reformatting does not flag a claim, editing does', () => {
   assert.equal(checkAnchor(source, () => edited).state, 'changed');
   assert.equal(checkAnchor(source, () => null).state, 'missing');
   assert.equal(checkAnchor(source, () => 'class Other {}').state, 'missing');
+});
+
+test('anchors: where indentation is syntax, re-nesting a line is an edit', () => {
+  // Moving the return out of the if: every token identical, control flow is not.
+  const py = 'def charge(user, amount):\n    if user.is_admin:\n        log("admin override")\n        return amount\n    return amount * 2\n';
+  const pyMoved = 'def charge(user, amount):\n    if user.is_admin:\n        log("admin override")\n    return amount\n    return amount * 2\n';
+  // tls moves from database to database.replica.
+  const yml = 'database:\n  host: db.internal\n  replica:\n    enabled: true\n  tls: required\n';
+  const ymlMoved = 'database:\n  host: db.internal\n  replica:\n    enabled: true\n    tls: required\n';
+
+  // The loose hash cannot tell them apart. That is the bug this guards.
+  assert.equal(hashRegion(py), hashRegion(pyMoved));
+  assert.equal(hashRegion(yml), hashRegion(ymlMoved));
+
+  for (const [p, before, after] of [['billing/charge.py', py, pyMoved], ['deploy/config.yaml', yml, ymlMoved], ['deploy/config.yml', yml, ymlMoved]]) {
+    assert.equal(hashModeFor({ path: p }), 'exact', p);
+    const source = { path: p, hash: hashRegion(before, undefined, undefined, 'exact') };
+    assert.equal(checkAnchor(source, () => before).state, 'match', p);
+    assert.equal(checkAnchor(source, () => after).state, 'changed', `${p}: re-nesting must flag the claim`);
+    // What exact mode still forgives.
+    const noise = `${before.replace(/\n/g, '  \r\n')}\n\n`;
+    assert.equal(checkAnchor(source, () => noise).state, 'match', `${p}: trailing spaces, CRLF and trailing blank lines are not edits`);
+    // An explicit loose override reproduces the old behaviour, and the validator says so.
+    assert.equal(checkAnchor({ ...source, hash: hashRegion(before), hash_mode: 'loose' }, () => after).state, 'match');
+  }
+
+  assert.equal(hashModeFor({ path: 'Makefile' }), 'exact');
+  assert.equal(hashModeFor({ path: 'notes.unknownext' }), 'exact', 'an unknown format is never forgiven');
+  assert.equal(hashModeFor({ path: 'a.ts' }), 'loose');
+  assert.equal(hashModeFor({ path: 'a.ts', hash_mode: 'exact' }), 'exact');
+});
+
+test('docs validator: a loose hash on a whitespace-significant file is warned about', () => {
+  const spec = docsExample();
+  const src = spec.claims.find((c) => c.source.kind === 'anchored').source;
+  Object.assign(src, { path: 'svc/app.py', hash_mode: 'loose' });
+  assert.ok(validateSpec(spec).warnings.some((w) => w.code === 'loose-hash'));
+  src.path = 'svc/app.ts';
+  assert.ok(!validateSpec(spec).warnings.some((w) => w.code === 'loose-hash'));
+  src.hash_mode = 'fuzzy';
+  assert.ok(validateSpec(spec).errors.some((e) => e.code === 'enum'));
+});
+
+test('incremental: a lock checked under another hash mode is re-checked, not reused', () => {
+  const claims = [{ id: 'a', source: { kind: 'anchored', path: 'a.py', hash: 'a'.repeat(12) } }];
+  // Written before modes existed: no mode, so it was loose.
+  const lock = { schema_version: 1, artifact: 'docs-lock', commit: 'old1234567', claims: { a: { state: 'match', hash: 'a'.repeat(12), commit: 'old1234567' } } };
+  assert.deepEqual([...planCheck({ claims, lock, commit: 'new7654321', changed: new Set(), dirty: new Set() }).recheck], ['a']);
+  lock.claims.a.mode = 'exact';
+  assert.equal(planCheck({ claims, lock, commit: 'new7654321', changed: new Set(), dirty: new Set() }).recheck.size, 0);
+  const next = mergeLock({ claims, lock, statuses: new Map([['a', { state: 'match' }]]), commit: 'new7654321' });
+  assert.equal(next.claims.a.mode, 'exact');
 });
 
 test('docs graph: confidence is computed from evidence and freshness', () => {

@@ -19,6 +19,7 @@
         "properties": {
           "state": { "enum": ["match", "changed", "missing"] },
           "hash": { "type": "string", "description": "The hash the spec declared when this entry was written. If the spec's hash differs now, the claim was re-anchored or rewritten and is re-checked regardless of what git says." },
+          "mode": { "enum": ["exact", "loose"], "description": "The hash mode the entry was checked under. A different mode now forces a re-check; an entry without one predates modes and was loose." },
           "commit": { "type": ["string", "null"], "description": "The commit this claim last verified at, carried forward across builds that reused it." },
           "detail": { "type": "string" }
         }
