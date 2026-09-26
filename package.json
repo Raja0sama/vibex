@@ -51,6 +51,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "test:e2e": "node --test --test-concurrency=1 test/e2e/*.e2e.mjs",
     "demo": "node bin/vibex.mjs demo out",
     "prepublishOnly": "npm test"
   },

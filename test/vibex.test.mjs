@@ -201,6 +201,40 @@ test('hostile spec: dashboard applies the same single-pass slot filling', () => 
   assert.ok(specs.some((s) => s.meta.title.includes('<!-- VIBEX:LEGEND -->')));
 });
 
+// A linked page's data file, evaluated the way the browser would.
+const linkedData = (js) => { const window = {}; new Function('window', js)(window); return window.VIBEX_DATA; };
+
+test('linked: the page is a placeholder and the data lives in sibling files', () => {
+  const spec = json('examples/orders.erd.json');
+  const inline = renderSpec(spec);
+  const { html, files } = renderSpec(spec, { linked: true, name: 'orders.erd' });
+  assert.deepEqual(Object.keys(inline.files), [], 'inline writes no siblings');
+  assert.deepEqual(Object.keys(files).sort(), ['orders.erd.data.js', 'vibex-viewer.css', 'vibex-viewer.js']);
+  assert.ok(html.includes('<script src="orders.erd.data.js"></script>'));
+  assert.ok(html.includes('<script src="vibex-viewer.js"></script>'));
+  assert.ok(html.includes('<link rel="stylesheet" href="vibex-viewer.css">'));
+  for (const slot of ['TITLE', 'SVG', 'SPEC', 'LEGEND', 'TYPE', 'THEME']) assert.ok(html.includes(`<!-- VIBEX:${slot} -->`), `${slot} left as a placeholder`);
+  assert.ok(!html.includes('<svg class="vibex') && !html.includes(spec.meta.title), 'no data in the page');
+  // The same values reach the page either way; only where they live differs.
+  const data = linkedData(files['orders.erd.data.js']);
+  assert.ok(inline.html.includes(data.slots.SVG));
+  assert.equal(JSON.parse(data.slots.SPEC).meta.title, spec.meta.title);
+});
+
+test('linked: dashboard uses the same placeholders, and hostile strings stay inert', () => {
+  const { html, files } = renderDashboard([{ file: 'hostile', spec: hostile() }, { file: 'orders', spec: json('examples/orders.erd.json') }], { title: 'D<!-- VIBEX:SPECS -->', linked: true, name: 'dash' });
+  for (const slot of ['NAV', 'PANELS', 'OVERVIEW', 'SPECS']) assert.ok(html.includes(`<!-- VIBEX:${slot} -->`));
+  const js = files['dash.data.js'];
+  assert.ok(!js.includes('<'), 'no literal < in the data file');
+  const data = linkedData(js);
+  assert.equal(data.slots.TITLE, 'D&lt;!-- VIBEX:SPECS --&gt;', 'values escaped as for an inline page');
+  assert.equal(JSON.parse(data.slots.SPECS).length, 2);
+});
+
+test('viewer.js carries no literal slot marker (it is inlined into single-file pages)', () => {
+  assert.ok(!read('assets/viewer.js').includes('<!-- VIBEX:'));
+});
+
 test('validator: layout values must be numbers in range', () => {
   const codes = (spec) => validateSpec(spec).errors.map((e) => `${e.code}:${e.at}`);
   assert.ok(codes(eps({ layout: { card_width: '1"><script>x</script>' } })).includes('type:layout.card_width'));

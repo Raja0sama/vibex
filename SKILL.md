@@ -269,11 +269,11 @@ Report the counts line as it prints, and if claims were **removed**, say so out 
 
 ```
 validate <spec.json> [--json]
-render   <spec.json> [out.html] [--open] [--json]
+render   <spec.json> [out.html] [--linked] [--open] [--json]
 import openapi <file.json|yaml> [out.json] [--title T] [--all-types]
 import graphql <schema.graphql>  [out.json] [--title T] [--erd]
 import prisma  <schema.prisma>   [out.json] [--title T]
-dashboard <out.html> <spec.json|dir>... [--title T] [--subtitle S] [--open] [--json]
+dashboard <out.html> <spec.json|dir>... [--title T] [--subtitle S] [--linked] [--open] [--json]
                   one HTML: sidebar of all diagrams, overview tiles, entity↔endpoint cross-links
 docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo dir]
      [--check] [--reanchor] [--lock docs.lock.json] [--no-lock] [--json]
@@ -281,7 +281,9 @@ docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo dir]
                   and a computed confidence. --check exits 1 on stale/broken/expired.
                   --md also writes the document as Markdown. Re-reads only the anchors
                   git says moved since the commit in the lock file.
-demo [dir]        render examples/ into dir (+ dashboard.html)
+demo [dir] [--linked]  render examples/ into dir (+ dashboard.html)
+--linked          write the HTML as a placeholder page: data in <name>.data.js, viewer in
+                  vibex-viewer.js/.css beside it. Opens from disk; keep the files together.
 outdated [dir]    which generated files this version would now render differently.
                   Exits 1 if any is stale, so CI can gate on it.
 types             list types with schema and example paths
@@ -301,4 +303,4 @@ YAML OpenAPI needs the optional `yaml` package: run `npm install` inside the ski
 
 ## Viewer
 
-Click a node for details (columns, fields, params, sources, relationships). `/` searches, `Esc` clears, `t` toggles theme, `0` fits, `+`/`-` zoom. `#node=<id>` in the URL deep-links to a node. SVG and PNG export buttons produce standalone files in the current theme.
+Click a node for details (columns, fields, params, sources, relationships). `/` searches, `Esc` clears, `t` toggles theme, `0` fits, `+`/`-` zoom. Dragging a box moves it (a C4 boundary or an endpoint card carries what is inside it) and re-routes its lines; the layout lives in memory until reload, `r` or Reset layout puts it back. `#node=<id>` in the URL deep-links to a node. SVG and PNG export buttons produce standalone files in the current theme.

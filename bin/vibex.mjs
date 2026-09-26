@@ -21,12 +21,12 @@ const HELP = `vibeX — you vibed it into existence; this shows you what you bui
 
 Usage:
   vibex validate <spec.json> [--json]
-  vibex render   <spec.json> [out.html] [--open] [--json]
+  vibex render   <spec.json> [out.html] [--linked] [--open] [--json]
   vibex import openapi <openapi.json|yaml> [out.json] [--title "..."] [--all-types]
   vibex import graphql <schema.graphql>    [out.json] [--title "..."] [--erd]
   vibex import prisma  <schema.prisma>     [out.json] [--title "..."]
   vibex dashboard <out.html> <spec.json|dir>... [--title "..."] [--subtitle "..."] [--repo <dir>]
-                  [--changelog changelog.json] [--open] [--json]
+                  [--changelog changelog.json] [--linked] [--open] [--json]
                                   one HTML with every diagram, sidebar, overview, cross-links.
                                   A *.docs.json in the set becomes a Documentation panel and a
                                   changelog.json beside them becomes a Changes panel;
@@ -41,11 +41,15 @@ Usage:
                   [--repo <dir>] [--title "..."] [--merges] [--json]
                                   build a release list from commit history, and — with
                                   --specs — what those commits did to the documentation
-  vibex demo [out-dir]          render the bundled examples (+ dashboard.html)
+  vibex demo [out-dir] [--linked]  render the bundled examples (+ dashboard.html)
   vibex outdated [dir]          which generated files this version would now render
                                 differently. Exits 1 if any is stale, so CI can gate on it.
   vibex types                   list diagram types and schema paths
   vibex help                    this text
+
+--linked writes the HTML as a placeholder page: its data goes in a sibling
+  <name>.data.js and the viewer in vibex-viewer.js / .css, loaded with plain
+  <script src> so it still opens from disk. Keep those files next to the HTML.
 
 Exit codes: 0 ok, 1 validation errors, 2 usage / IO error.
   docs --check also exits 1 when any claim is stale, broken, or expired.
@@ -89,6 +93,13 @@ function writeOut(file, content) {
     fs.writeFileSync(file, content);
   } catch (e) { fail(`Cannot write ${file}: ${e.message}`); }
 }
+
+function writePage(out, html, files = {}) {
+  writeOut(out, html);
+  for (const [name, content] of Object.entries(files)) writeOut(path.join(path.dirname(out), name), content);
+}
+
+const pageName = (out) => path.basename(out).replace(/\.html?$/i, '');
 
 function fail(message, exitCode = 2) {
   process.stderr.write(`${message}\n`);
@@ -362,21 +373,22 @@ function cmdValidate(args) {
 function cmdRender(args) {
   const json = boolFlag(args, '--json');
   const open = boolFlag(args, '--open');
+  const linked = boolFlag(args, '--linked');
   rejectUnknownFlags(args);
   const [file, outArg] = args;
   if (!file) fail(HELP);
   const spec = readJson(file);
   const out = path.resolve(outArg || file.replace(/\.json$/i, '') + '.html');
-  const { report, html, warnings, width, height } = renderSpec(spec);
+  const { report, html, files, warnings, width, height } = renderSpec(spec, { linked, name: pageName(out) });
   if (!report.ok) {
     if (json) console.log(JSON.stringify({ ok: false, errors: report.errors, warnings: report.warnings }, null, 2));
     else console.error(formatReport(report));
     process.exit(1);
   }
-  writeOut(out, html);
+  writePage(out, html, files);
   const allWarnings = [...report.warnings.map((w) => w.message), ...warnings];
   if (json) {
-    console.log(JSON.stringify({ ok: true, output: out, diagram_type: spec.diagram_type, bytes: Buffer.byteLength(html), viewBox: [width, height], warnings: allWarnings }, null, 2));
+    console.log(JSON.stringify({ ok: true, output: out, ...(linked ? { files: Object.keys(files) } : {}), diagram_type: spec.diagram_type, bytes: Buffer.byteLength(html), viewBox: [width, height], warnings: allWarnings }, null, 2));
   } else {
     for (const w of allWarnings) console.error(`warning ${w}`);
     console.log(out);
@@ -445,6 +457,7 @@ async function cmdDashboard(args) {
   const json = boolFlag(args, '--json');
   const repoArg = valueFlag(args, '--repo');
   const changelogArg = valueFlag(args, '--changelog');
+  const linked = boolFlag(args, '--linked');
   rejectUnknownFlags(args);
   const [outArg, ...inputs] = args;
   if (!outArg || !inputs.length) fail(HELP);
@@ -476,11 +489,11 @@ async function cmdDashboard(args) {
     if (loaded?.artifact === 'changelog') changelog = loaded;
     else console.error(`warning ${clPath} is not a changelog artefact; ignoring it`);
   }
-  const { html, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit, changelog });
+  const out = path.resolve(outArg);
+  const { html, files, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit, changelog, linked, name: pageName(out) });
   for (const p of problems) console.error(`skipped ${p.file}: ${p.errors.map((e) => e.message).join('; ')}`);
   for (const w of warnings) console.error(`warning ${w}`);
-  const out = path.resolve(outArg);
-  writeOut(out, html);
+  writePage(out, html, files);
   const skipped = [...unreadable.map((u) => u.file), ...problems.map((p) => p.file)];
   if (json) console.log(JSON.stringify({ ok: true, output: out, diagrams: entries.map((e) => ({ file: e.file, type: e.spec.diagram_type, title: e.spec.meta.title })), skipped, warnings }, null, 2));
   else console.log(out);
@@ -489,6 +502,7 @@ async function cmdDashboard(args) {
 }
 
 async function cmdDemo(args) {
+  const linked = boolFlag(args, '--linked');
   rejectUnknownFlags(args);
   const outDir = path.resolve(args[0] || 'out');
   try { fs.mkdirSync(outDir, { recursive: true }); } catch (e) { fail(`Cannot create ${outDir}: ${e.message}`); }
@@ -529,15 +543,16 @@ async function cmdDemo(args) {
     anchorStatus: (spec) => anchorStatusFor(spec, fixtureRepo),
     commit: head(gitRunner(root)),
     changelog,
+    linked,
   });
-  writeOut(path.join(outDir, 'dashboard.html'), dash.html);
+  writePage(path.join(outDir, 'dashboard.html'), dash.html, dash.files);
   console.log(path.join(outDir, 'dashboard.html'));
   for (const { file: name, spec } of examples) {
     if (!DIAGRAM_TYPES.includes(spec.diagram_type)) continue; // docs live in the dashboard
-    const { report, html, warnings } = renderSpec(spec);
+    const { report, html, files, warnings } = renderSpec(spec, { linked, name });
     if (!report.ok) { console.error(`${name}: ${formatReport(report)}`); continue; }
     const out = path.join(outDir, `${name}.html`);
-    writeOut(out, html);
+    writePage(out, html, files);
     for (const w of warnings) console.error(`warning ${name}: ${w}`);
     console.log(out);
   }
