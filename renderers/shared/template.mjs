@@ -35,17 +35,46 @@ export const TOOLBAR_ACTIONS = `<div class="tools">
         <button type="button" data-role="export-svg" title="Download as SVG">${ICON.download}<span>SVG</span></button>
         <button type="button" data-role="export-png" title="Download as PNG"><span>PNG</span></button>
       </div>
+      <button type="button" data-role="reset-layout" title="Put moved boxes back (r)" hidden>Reset layout</button>
       <button type="button" class="icon" data-role="theme" title="Toggle light / dark (t)" aria-label="Toggle light or dark theme">${ICON.sun}${ICON.moon}</button>
     </div>`;
 
-// The viewer runtime and stylesheet are inlined so the output stays one file.
-export function assetSlots() {
-  return {
-    VIEWER_JS: fs.readFileSync(VIEWER_JS_PATH, 'utf8').replace(/<\/script/gi, '<\\/script'),
-    CSS: fs.readFileSync(VIEWER_CSS_PATH, 'utf8'),
+// inline: one file. linked: slots stay as placeholders and their values go in
+// <name>.data.js, loaded with <script src> so file:// still works.
+export const LINKED_VIEWER_JS = 'vibex-viewer.js';
+export const LINKED_VIEWER_CSS = 'vibex-viewer.css';
+
+export function assetSlots({ dataFile = null } = {}) {
+  const shared = {
     ACTIONS: TOOLBAR_ACTIONS,
     // Every shell that inlines the assets also records which assets it inlined.
     STAMP: stampHtml(),
+  };
+  if (dataFile) {
+    return {
+      ...shared,
+      CSS: `<link rel="stylesheet" href="${esc(LINKED_VIEWER_CSS)}">`,
+      VIEWER_JS: `<script src="${esc(dataFile)}"></script>\n<script src="${esc(LINKED_VIEWER_JS)}"></script>`,
+    };
+  }
+  return {
+    ...shared,
+    CSS: `<style>\n${fs.readFileSync(VIEWER_CSS_PATH, 'utf8')}\n</style>`,
+    VIEWER_JS: `<script>\n${fs.readFileSync(VIEWER_JS_PATH, 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`,
+  };
+}
+
+// Returns { html, files }; files holds the linked-mode siblings.
+export function buildPage(template, values, { linked = false, name = 'page' } = {}) {
+  if (!linked) return { html: fillSlots(template, { ...assetSlots(), ...values }), files: {} };
+  const dataFile = `${name}.data.js`;
+  return {
+    html: fillSlots(template, assetSlots({ dataFile })),
+    files: {
+      [dataFile]: `window.VIBEX_DATA = ${embedJson({ slots: values })};\n`,
+      [LINKED_VIEWER_JS]: fs.readFileSync(VIEWER_JS_PATH, 'utf8'),
+      [LINKED_VIEWER_CSS]: fs.readFileSync(VIEWER_CSS_PATH, 'utf8'),
+    },
   };
 }
 
@@ -85,9 +114,8 @@ export function renderLegend(entries = []) {
     <li><span class="swatch ${esc(e.className || '')}" style="${esc(e.style || '')}">${e.glyph || ''}</span><span>${esc(e.label)}</span></li>`).join('')}</ul>`;
 }
 
-export function applyTemplate(template, { spec, svg, legend, embedSpec = spec }) {
-  return fillSlots(template, {
-    ...assetSlots(),
+export function applyTemplate(template, { spec, svg, legend, embedSpec = spec }, options = {}) {
+  return buildPage(template, {
     TITLE: esc(spec.meta.title),
     SUBTITLE: esc(spec.meta.subtitle || ''),
     TYPE: esc(spec.diagram_type),
@@ -96,5 +124,5 @@ export function applyTemplate(template, { spec, svg, legend, embedSpec = spec })
     LEGEND: renderLegend(legend),
     CARDS: renderCards(spec.cards),
     SPEC: embedJson(embedSpec),
-  });
+  }, options);
 }

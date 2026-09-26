@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- VIBEX:STAMP -->
 <title><!-- VIBEX:TITLE --></title>
-<style>
 <!-- VIBEX:CSS -->
+<style>
 body{display:flex;flex-direction:column;min-height:100vh}
 .viewer{flex:1}
 @media (max-width:900px){body{min-height:auto;height:auto}html{height:auto}.viewer{flex:none}}
@@ -25,7 +25,7 @@ body{display:flex;flex-direction:column;min-height:100vh}
   <div class="viewer-body">
     <div class="canvas" data-role="canvas">
       <!-- VIBEX:SVG -->
-      <div class="hint">drag to pan · wheel to zoom · click a node · Esc clears</div>
+      <div class="hint">drag a box to move it · drag empty space to pan · wheel to zoom · click a node</div>
     </div>
     <aside>
       <section><h2>Details</h2><div class="details" data-role="details" aria-live="polite"><p class="empty">Click a node or relationship.</p></div></section>
@@ -36,9 +36,7 @@ body{display:flex;flex-direction:column;min-height:100vh}
   <div class="cards"><!-- VIBEX:CARDS --></div>
 </section>
 <script id="vibex-spec" type="application/json"><!-- VIBEX:SPEC --></script>
-<script>
 <!-- VIBEX:VIEWER_JS -->
-</script>
 <script>
 (function () {
   var spec = JSON.parse(document.getElementById('vibex-spec').textContent);

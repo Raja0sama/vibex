@@ -4,7 +4,11 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- **Drag boxes to move them.** Lines re-route and labels follow. A C4 boundary carries what's inside; an endpoint row drags its card. Fit and export include moved boxes. `r` or **Reset layout** puts them back.
+- **Layout lives until reload.** Each dashboard panel keeps its moves, zoom, selection and search while you switch panels. Nothing is stored.
+- **`--linked`** on `render`, `dashboard`, `demo`. The HTML is a placeholder; data goes in `<name>.data.js`, the viewer in `vibex-viewer.js/.css`. Still opens from disk. Default single-file output is unchanged.
+- **Browser tests:** `npm run test:e2e` (needs `playwright-core` and Chrome).
 
 ## [0.5.0] - 2026-09-24
 

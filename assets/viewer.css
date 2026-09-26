@@ -416,3 +416,8 @@ nav a[data-proposed] .t em{font-style:normal;font-size:10px;text-transform:upper
   .p-toggle,.cards-bar{display:none!important}
   .cards[hidden]{display:grid!important}
 }
+/* Boxes can be dragged; empty canvas pans. */
+svg.vibex [data-node-id]{cursor:grab}
+.canvas.moving,.canvas.moving svg.vibex [data-node-id]{cursor:grabbing}
+.canvas.moving svg.vibex{user-select:none}
+button[data-role="reset-layout"][hidden]{display:none}

@@ -15,19 +15,18 @@ export function embeddable(spec, result) {
   return { ...spec, groups: [...(spec.groups || []), ...result.syntheticGroups] };
 }
 
-// Validate, then render to a complete standalone HTML document.
-// Returns html = null when validation fails.
-export function renderSpec(spec) {
+// Validate, then render. Returns html = null when validation fails.
+export function renderSpec(spec, options = {}) {
   const report = validateSpec(spec);
-  if (!report.ok) return { report, html: null, warnings: [] };
+  if (!report.ok) return { report, html: null, files: {}, warnings: [] };
   // A valid spec is not necessarily a drawable one: `docs` renders into the
   // dashboard, not to a standalone diagram.
   if (!RENDERERS[spec.diagram_type]) {
     report.error('not-a-diagram', `diagram_type "${spec.diagram_type}" has no diagram renderer; build it with "vibex docs" or include it in a dashboard`, 'diagram_type');
-    return { report, html: null, warnings: [] };
+    return { report, html: null, files: {}, warnings: [] };
   }
   const template = loadTemplate();
   const result = RENDERERS[spec.diagram_type](spec);
-  const html = applyTemplate(template, { spec, svg: result.svg, legend: result.legend, embedSpec: embeddable(spec, result) });
-  return { report, html, warnings: result.warnings || [], width: result.width, height: result.height };
+  const { html, files } = applyTemplate(template, { spec, svg: result.svg, legend: result.legend, embedSpec: embeddable(spec, result) }, options);
+  return { report, html, files, warnings: result.warnings || [], width: result.width, height: result.height };
 }

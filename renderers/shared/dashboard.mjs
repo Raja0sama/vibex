@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { esc } from './utils.mjs';
 import { validateSpec } from './validate.mjs';
 import { RENDERERS, embeddable } from './render.mjs';
-import { renderCards, renderLegend, assetSlots, fillSlots, embedJson, TOOLBAR_ACTIONS } from './template.mjs';
+import { renderCards, renderLegend, buildPage, embedJson, TOOLBAR_ACTIONS } from './template.mjs';
 import { buildGraph, specId } from '../docs/graph.mjs';
 import { renderDocsPanel, docsNavHtml } from '../docs/render-docs.mjs';
 import { renderChangelogPanel, changelogNavHtml } from '../changelog/render-changelog.mjs';
@@ -56,7 +56,7 @@ function panelHtml(index, spec, result) {
       ${TOOLBAR_ACTIONS}
     </header>
     <div class="viewer-body">
-      <div class="canvas" data-role="canvas">${namespaceSvg(result.svg, `d${index}-`)}<div class="hint">drag to pan · wheel to zoom · click a node · Esc clears</div></div>
+      <div class="canvas" data-role="canvas">${namespaceSvg(result.svg, `d${index}-`)}<div class="hint">drag a box to move it · drag empty space to pan · wheel to zoom · click a node</div></div>
       <aside>
         <section><h2>Details</h2><div class="details" data-role="details" aria-live="polite"><p class="empty">Click a node or relationship.</p></div></section>
         <section><h2>Legend</h2>${renderLegend(result.legend)}</section>
@@ -137,7 +137,7 @@ export function loadDashboardTemplate(templatePath = DASHBOARD_TEMPLATE_PATH) {
 }
 
 // specs: array of { spec, file } where file is the spec's basename without extension.
-export function renderDashboard(items, { title = 'Architecture', subtitle, theme, anchorStatus = null, commit = null, changelog = null, now } = {}) {
+export function renderDashboard(items, { title = 'Architecture', subtitle, theme, anchorStatus = null, commit = null, changelog = null, now, linked = false, name = 'dashboard' } = {}) {
   const entries = [];
   const problems = [];
   const docsSpecs = [];
@@ -225,8 +225,7 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     panels += renderChangelogPanel(changelog, { repository, resolveSpec });
   }
 
-  const html = fillSlots(loadDashboardTemplate(), {
-    ...assetSlots(),
+  const { html, files } = buildPage(loadDashboardTemplate(), {
     TITLE: esc(title),
     SUBTITLE: esc(subtitle || `${entries.length} diagrams`),
     THEME: esc(theme || 'auto'),
@@ -234,6 +233,6 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
     PANELS: panels,
     OVERVIEW: `<div class="overview">${overviewHtml(title, subtitle, entries)}</div>`,
     SPECS: embedJson(entries.map((e) => ({ ...(e.embed || e.spec), __file: e.file }))),
-  });
-  return { html, entries, problems, warnings, docsGraphs, docsGraph: docsGraphs[0] || null };
+  }, { linked, name });
+  return { html, files, entries, problems, warnings, docsGraphs, docsGraph: docsGraphs[0] || null };
 }

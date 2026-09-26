@@ -80,6 +80,8 @@ vibex validate docs/db.erd.json
 
 # 3. render — one file, CSS and JS inlined, spec embedded
 vibex render docs/db.erd.json --open
+#    or --linked: the HTML is only a placeholder; data goes in db.erd.data.js
+#    and the viewer in vibex-viewer.js/.css beside it (still opens from disk)
 
 # every spec in the folder, one page, cross-linked
 vibex dashboard docs/index.html docs --title "Payments platform" --repo .
@@ -317,7 +319,10 @@ Hand it to a contractor, an auditor, or the new hire on their first morning. It'
 
 A PNG of a 40-table schema is a wall. This one you can interrogate:
 
-<kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>-</kbd> zoom · <kbd>Esc</kbd> clear
+<kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>-</kbd> zoom · <kbd>r</kbd> reset layout · <kbd>Esc</kbd> clear
+
+Drag any box to move it and its lines re-route to follow. The layout is yours until you
+reload the page, which puts everything back where it was generated.
 
 Click any node for its columns, fields, params and relationships. `#node=<id>` deep-links
 to one specific table in one specific diagram — so you can send someone *the thing*, not
