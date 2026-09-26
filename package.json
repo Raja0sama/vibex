@@ -1,6 +1,6 @@
 {
   "name": "@vibex/vibex",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Architecture diagrams and checkable documentation from your codebase: ERD, C4, API endpoints and lifecycle diagrams, plus a fact graph whose claims fail CI when the code moves. Imports OpenAPI, GraphQL SDL and Prisma. One standalone HTML file, zero dependencies, no server.",
   "keywords": [
     "diagram",
