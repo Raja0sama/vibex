@@ -7,6 +7,9 @@ All notable changes to this project are recorded here. The format follows Keep a
 ### Added
 - **Install in Claude Code and Codex with one command.** `npx skills add Raja0sama/vibex -g -a claude-code -a codex -y`. Claude Code can also install it as a plugin: `/plugin marketplace add Raja0sama/vibex`, then `/plugin install vibex@vibex`.
 
+### Fixed
+- **`links` counts as a diagram type.** `vibex types` lists it, `demo` renders `shop.links.html`, and `docs` and `links` can load a links spec beside the others.
+
 ### Changed
 - **Skill description** fits the 1024-character Agent Skills limit and now triggers on service maps and Mermaid.
 

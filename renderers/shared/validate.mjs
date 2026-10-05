@@ -710,7 +710,7 @@ function validateLinks(spec, report) {
 const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, docs: validateDocs, links: validateLinks };
 
 // Types that render to a diagram. `docs` is a spec but not a diagram.
-export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle'];
+export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle', 'links'];
 export const SPEC_TYPES = Object.keys(VALIDATORS);
 
 export function validateSpec(spec) {
