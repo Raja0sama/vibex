@@ -54,7 +54,7 @@ npx @vibex/vibex demo out                                      # or look first: 
 The mark is the same idea: two edges crossing. Everything interesting in a system is a
 line between two things, not the things themselves.
 
-## Four diagrams. One source of truth.
+## Five diagrams. One source of truth.
 
 | | Type | What it draws | Import from |
 |---|---|---|---|
@@ -62,10 +62,22 @@ line between two things, not the things themselves.
 | 🟣 | `c4` | persons, systems, containers, components, databases, queues, each with its own fill, inside tinted nested boundaries | hand-authored |
 | 🟢 | `endpoints` | REST routes, GraphQL operations, published events — grouped by resource, with method badges, auth, params, status codes | OpenAPI 2/3, GraphQL SDL |
 | 🟡 | `lifecycle` | every state a thing can reach and every legal move between them, with actor, event, guard and side effect on each arrow | hand-authored |
+| 🔷 | `links` | the **System view**: every call between services, pinned to the client that makes it and the handler that serves it, across repositories | hand-authored from clients and handlers |
 
 Each is a validated JSON spec plus a rendered viewer. **The spec is the artifact you keep;
 the HTML is disposable.** Documentation and changes are two more views over the same
-specs — **six panels in all**, in one dashboard file.
+specs, all in one dashboard file. Every diagram also exports as Mermaid
+(`vibex mermaid <spec>`, or the button in the viewer) for Markdown that renders it.
+
+**Which service calls which.** A `*.links.json` records each call once, anchored on both
+ends. `vibex links` checks it against the code:
+
+```bash
+vibex links system.links.json docs --repo bff=../bff --repo orders=../orders --check
+```
+
+It fails when a client or handler moved, an endpoint it names is gone, or a C4 arrow has
+no call behind it. It also lists endpoints nothing calls. In a monorepo, pass `--repo .`.
 
 ## Three commands. No config file.
 
@@ -409,8 +421,8 @@ if your OpenAPI document is YAML rather than JSON.
 - **Monorepo support** — one repository, many packages, one dashboard. Specs beside the
   package they describe, anchors that resolve inside it, and a root view that stitches them
   together without anyone maintaining a list by hand.
-- **One logical system** — thirty services in thirty repositories, rendered as one map:
-  which service owns which table, which one calls which, and where the boundaries actually sit.
+- ~~**One logical system**~~ — shipped in 0.7 as the System view (`links`, above). Next
+  for it: which service owns which table.
 - **A GitHub Action** that runs in *your* CI, regenerates on every pull request, and comments
   what moved — *"2 tables, 3 endpoints."* Still no server.
 - **A hosted tier**, for teams who would rather buy the outcome than own the pipeline. The
