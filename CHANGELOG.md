@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.7.1] - 2026-10-05
+
 ### Added
 - **Install in Claude Code and Codex with one command.** `npx skills add Raja0sama/vibex -g -a claude-code -a codex -y`. Claude Code can also install it as a plugin: `/plugin marketplace add Raja0sama/vibex`, then `/plugin install vibex@vibex`.
 

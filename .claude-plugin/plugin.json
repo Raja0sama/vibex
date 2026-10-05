@@ -1,11 +1,22 @@
 {
   "name": "vibex",
   "displayName": "vibeX",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "ERD, C4, API endpoint, lifecycle and service-links diagrams from your code, as a JSON spec plus a standalone HTML viewer, and documentation whose claims fail CI when the code moves.",
-  "author": { "name": "Raja Osama", "url": "https://github.com/Raja0sama" },
+  "author": {
+    "name": "Raja Osama",
+    "url": "https://github.com/Raja0sama"
+  },
   "homepage": "https://github.com/Raja0sama/vibex#readme",
   "repository": "https://github.com/Raja0sama/vibex",
   "license": "MIT",
-  "keywords": ["diagram", "erd", "c4", "openapi", "mermaid", "architecture", "docs"]
+  "keywords": [
+    "diagram",
+    "erd",
+    "c4",
+    "openapi",
+    "mermaid",
+    "architecture",
+    "docs"
+  ]
 }
