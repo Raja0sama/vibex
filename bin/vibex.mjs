@@ -13,6 +13,9 @@ import { readCommits, buildChangelog, resolve as resolveRef, diffClaims } from '
 import { changelogToMarkdown } from '../renderers/changelog/to-markdown.mjs';
 import { planCheck, mergeLock, verifiedCommits, emptyLock } from '../renderers/docs/incremental.mjs';
 import { buildFingerprint, readStamp, packageVersion } from '../renderers/shared/stamp.mjs';
+import { checkLinks, reanchorLinks } from '../renderers/links/check.mjs';
+import { parseLayout, checkLayoutAgainst, applyLayout, spliceLayout } from '../renderers/shared/positions.mjs';
+import { toMermaid } from '../renderers/mermaid/to-mermaid.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -22,6 +25,8 @@ const HELP = `vibeX — you vibed it into existence; this shows you what you bui
 Usage:
   vibex validate <spec.json> [--json]
   vibex render   <spec.json> [out.html] [--linked] [--open] [--json]
+  vibex mermaid  <spec.json> [out.mmd]   the diagram as Mermaid, for Markdown that renders it
+                                  (GitHub, GitLab, Notion). render also writes <out>.mmd beside the HTML.
   vibex import openapi <openapi.json|yaml> [out.json] [--title "..."] [--all-types]
   vibex import graphql <schema.graphql>    [out.json] [--title "..."] [--erd]
   vibex import prisma  <schema.prisma>     [out.json] [--title "..."]
@@ -37,6 +42,15 @@ Usage:
                                   each with provenance and a computed confidence.
                                   Uses git to re-read only the anchors whose files moved
                                   since the commit recorded in the lock file.
+  vibex links <links.json> [<spec.json|dir>...] --repo [name=]<dir>... [--check] [--reanchor] [--json]
+                                  check how services connect: every call is anchored on the client
+                                  and handler side. --repo name=dir per repo; plain --repo dir for one.
+                                  compares any C4 the services are drawn in (services[].c4).
+                                  --check exits 1 when an anchor moved, a ref dangles, or a C4 drifted.
+  vibex layout <spec.json> [<layout.json>|-] [--replace] [--clear] [--json]
+                                  save boxes moved in the viewer: merges the JSON from "Save layout"
+                                  (or an issue body holding it; - reads stdin) into layout.positions.
+                                  --replace drops earlier pins first; --clear removes them all.
   vibex changelog [<from>..<to>] [-o changelog.json] [--md CHANGES.md] [--specs <dir>]
                   [--repo <dir>] [--title "..."] [--merges] [--json]
                                   build a release list from commit history, and — with
@@ -358,6 +372,128 @@ function cmdDocs(args) {
   process.exit(check && unresolved ? 1 : 0);
 }
 
+// Every --repo value: "name=dir" names a repo, a bare "dir" is the default.
+function repoFlags(args) {
+  const repos = {};
+  let i;
+  while ((i = args.indexOf('--repo')) !== -1) {
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith('--')) fail('--repo needs a value, e.g. --repo orders=../orders');
+    args.splice(i, 2);
+    const eq = value.indexOf('=');
+    if (eq > 0 && !value.slice(0, eq).includes('/')) repos[value.slice(0, eq)] = path.resolve(value.slice(eq + 1));
+    else repos[''] = path.resolve(value);
+  }
+  return repos;
+}
+
+function readerIn(repoRoot) {
+  return (rel) => {
+    const abs = path.resolve(repoRoot, rel);
+    if (!abs.startsWith(repoRoot + path.sep)) return null;
+    try { return fs.readFileSync(abs, 'utf8'); } catch { return null; }
+  };
+}
+
+function cmdLinks(args) {
+  const asJson = boolFlag(args, '--json');
+  const check = boolFlag(args, '--check');
+  const reanchor = boolFlag(args, '--reanchor');
+  const repos = repoFlags(args);
+  rejectUnknownFlags(args);
+  const [linksFile, ...specPaths] = args;
+  if (!linksFile) fail(HELP);
+
+  const spec = readJson(linksFile);
+  const report = validateSpec(spec);
+  if (spec.diagram_type !== 'links') report.error('diagram_type', `${linksFile} is a ${spec.diagram_type} spec, not links`, 'diagram_type');
+  if (!report.ok) {
+    if (asJson) console.log(JSON.stringify({ ok: false, errors: report.errors, warnings: report.warnings }, null, 2));
+    else console.error(formatReport(report));
+    process.exit(1);
+  }
+  if (!Object.keys(repos).length) repos[''] = process.cwd();
+  const readers = Object.fromEntries(Object.entries(repos).map(([k, v]) => [k, readerIn(v)]));
+  const readerFor = (name) => readers[name] || (Object.keys(readers).length === 1 && readers[''] ? readers[''] : null);
+
+  const specs = loadSpecs(specPaths.length ? specPaths : [path.dirname(linksFile)]);
+  let result = checkLinks(spec, { readerFor, specs });
+  if (reanchor) {
+    const n = reanchorLinks(spec, result);
+    writeOut(path.resolve(linksFile), `${JSON.stringify(spec, null, 2)}\n`);
+    console.error(`reanchored ${n} anchor(s) in ${linksFile} — re-read each call before trusting it`);
+    result = checkLinks(spec, { readerFor, specs });
+  }
+
+  const { counts } = result;
+  if (asJson) {
+    console.log(JSON.stringify({ ok: !check || (counts.broken === 0 && counts.drift === 0), ...result, warnings: report.warnings }, null, 2));
+  } else {
+    for (const w of report.warnings) console.error(`warning ${w.message}`);
+    console.log(`${counts.links} links — ${counts.ok} ok, ${counts.broken} broken${counts.uncalled ? `, ${counts.uncalled} endpoint(s) nothing calls` : ''}`);
+    const show = (s) => (s && !['match', 'external'].includes(s.state) ? s : null);
+    for (const l of result.links) {
+      for (const [side, s] of [['client', l.client], ['handler', l.handler], ['endpoint', l.endpoint]]) {
+        if (show(s)) console.log(`  ${s.state.padEnd(12)} ${l.id} (${l.from} → ${l.to} ${l.route}) ${side}: ${s.detail}`);
+      }
+    }
+    for (const u of result.uncalled) console.log(`  uncalled     ${u.service} ${u.route} (${u.endpoint})`);
+    for (const d of result.diagrams) {
+      const n = d.unbacked.length + d.missing.length + d.undrawn.length;
+      console.log(`${d.spec}: ${d.error || (n ? `${n} drift` : 'matches the links')}`);
+      for (const a of d.unbacked) console.log(`  no link      arrow ${a.from} → ${a.to} has no call behind it`);
+      for (const m of d.missing) console.log(`  no arrow     ${m.from} → ${m.to} (${m.links} call${m.links === 1 ? '' : 's'}) is not drawn`);
+      for (const u of d.undrawn) console.log(`  not drawn    ${u.absent} is missing, yet ${u.from} → ${u.to} (${u.links} call${u.links === 1 ? '' : 's'})`);
+    }
+  }
+  process.exit(check && (counts.broken || counts.drift) ? 1 : 0);
+}
+
+function cmdLayout(args) {
+  const asJson = boolFlag(args, '--json');
+  const replace = boolFlag(args, '--replace');
+  const clear = boolFlag(args, '--clear');
+  rejectUnknownFlags(args);
+  const [specFile, layoutFile] = args;
+  if (!specFile || (!layoutFile && !clear)) fail(HELP);
+  const spec = readJson(specFile);
+  if (!validateSpec(spec).ok) fail(`${specFile} is not a valid spec; run "vibex validate ${specFile}"`, 1);
+
+  let result = { good: {}, unknown: [], invalid: [], wrongSpec: false };
+  if (layoutFile) {
+    const text = layoutFile === '-' ? fs.readFileSync(0, 'utf8') : readText(layoutFile);
+    const layout = parseLayout(text);
+    if (!layout) fail(`${layoutFile} holds no saved layout: expected JSON with "positions" (from "Save layout" in the viewer)`, 1);
+    result = checkLayoutAgainst(spec, layout);
+    if (result.wrongSpec) fail(`this layout was saved from "${layout.spec}", not ${spec.meta.id} (${specFile})`, 1);
+  }
+  applyLayout(spec, result.good, { replace: replace || clear });
+  const report = validateSpec(spec);
+  if (!report.ok) fail(formatReport(report), 1);
+  writeOut(path.resolve(specFile), spliceLayout(readText(specFile), spec));
+
+  const saved = Object.keys(result.good).length;
+  if (asJson) console.log(JSON.stringify({ ok: true, saved, unknown: result.unknown, invalid: result.invalid }, null, 2));
+  else {
+    console.log(clear && !saved ? `cleared every pinned box in ${specFile}` : `pinned ${saved} box(es) in ${specFile}`);
+    if (result.unknown.length) console.error(`skipped ${result.unknown.length} id(s) not in this diagram: ${result.unknown.join(', ')}`);
+    if (result.invalid.length) console.error(`skipped ${result.invalid.length} position(s) that are not [x, y]: ${result.invalid.join(', ')}`);
+  }
+  process.exit(0);
+}
+
+function cmdMermaid(args) {
+  rejectUnknownFlags(args);
+  const [file, out] = args;
+  if (!file) fail(HELP);
+  const spec = readJson(file);
+  const report = validateSpec(spec);
+  if (!report.ok) { console.error(formatReport(report)); process.exit(1); }
+  const text = toMermaid(spec);
+  if (!text) fail(`${spec.diagram_type} has no Mermaid form; diagrams do: erd, c4, endpoints, lifecycle, links`);
+  if (out) { writeOut(path.resolve(out), text); console.log(path.resolve(out)); } else process.stdout.write(text);
+}
+
 function cmdValidate(args) {
   const json = boolFlag(args, '--json');
   rejectUnknownFlags(args);
@@ -379,16 +515,19 @@ function cmdRender(args) {
   if (!file) fail(HELP);
   const spec = readJson(file);
   const out = path.resolve(outArg || file.replace(/\.json$/i, '') + '.html');
-  const { report, html, files, warnings, width, height } = renderSpec(spec, { linked, name: pageName(out) });
+  const { report, html, files, warnings, width, height } = renderSpec(spec, { linked, name: pageName(out), specId: path.basename(file).replace(/\.json$/i, '') });
   if (!report.ok) {
     if (json) console.log(JSON.stringify({ ok: false, errors: report.errors, warnings: report.warnings }, null, 2));
     else console.error(formatReport(report));
     process.exit(1);
   }
   writePage(out, html, files);
+  // Every render also leaves the Mermaid text beside the page.
+  const mermaid = out.replace(/\.html?$/i, '') + '.mmd';
+  writeOut(mermaid, toMermaid(spec));
   const allWarnings = [...report.warnings.map((w) => w.message), ...warnings];
   if (json) {
-    console.log(JSON.stringify({ ok: true, output: out, ...(linked ? { files: Object.keys(files) } : {}), diagram_type: spec.diagram_type, bytes: Buffer.byteLength(html), viewBox: [width, height], warnings: allWarnings }, null, 2));
+    console.log(JSON.stringify({ ok: true, output: out, mermaid, ...(linked ? { files: Object.keys(files) } : {}), diagram_type: spec.diagram_type, bytes: Buffer.byteLength(html), viewBox: [width, height], warnings: allWarnings }, null, 2));
   } else {
     for (const w of allWarnings) console.error(`warning ${w}`);
     console.log(out);
@@ -549,10 +688,11 @@ async function cmdDemo(args) {
   console.log(path.join(outDir, 'dashboard.html'));
   for (const { file: name, spec } of examples) {
     if (!DIAGRAM_TYPES.includes(spec.diagram_type)) continue; // docs live in the dashboard
-    const { report, html, files, warnings } = renderSpec(spec, { linked, name });
+    const { report, html, files, warnings } = renderSpec(spec, { linked, name, specId: name });
     if (!report.ok) { console.error(`${name}: ${formatReport(report)}`); continue; }
     const out = path.join(outDir, `${name}.html`);
     writePage(out, html, files);
+    writeOut(path.join(outDir, `${name}.mmd`), toMermaid(spec));
     for (const w of warnings) console.error(`warning ${name}: ${w}`);
     console.log(out);
   }
@@ -625,6 +765,9 @@ switch (command) {
   case 'import': await cmdImport(rest); break;
   case 'dashboard': await cmdDashboard(rest); break;
   case 'docs': cmdDocs(rest); break;
+  case 'links': cmdLinks(rest); break;
+  case 'layout': cmdLayout(rest); break;
+  case 'mermaid': cmdMermaid(rest); break;
   case 'changelog': cmdChangelog(rest); break;
   case 'demo': await cmdDemo(rest); break;
   case 'outdated': cmdOutdated(rest); break;

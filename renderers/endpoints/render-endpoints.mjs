@@ -1,5 +1,6 @@
 import { esc, svgText, nodeAttrs, truncate, textWidth, fitChars, num } from '../shared/utils.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
+import { pinPositions } from '../shared/layout.mjs';
 
 const MARGIN = 40;
 const GAP = 28;
@@ -57,7 +58,7 @@ function groupCardHeight(endpoints, withSummary) {
 
 function renderGroupCard(group, endpoints, x, y, w, withSummary) {
   const h = groupCardHeight(endpoints, withSummary);
-  let out = `<g class="ep-card" data-group-id="${esc(group.id)}" data-node-id="${esc(group.id)}" data-node-label="${esc(group.label)}" data-node-kind="group">`;
+  let out = `<g class="ep-card" data-group-id="${esc(group.id)}" data-node-id="${esc(group.id)}" data-node-label="${esc(group.label)}" data-node-kind="group" data-at="${x} ${y}">`;
   out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${HEAD_H - 8} h${-w} z"/>`;
   out += `<line x1="${x}" y1="${y + HEAD_H}" x2="${x + w}" y2="${y + HEAD_H}" style="stroke:var(--border)"/>`;
@@ -81,7 +82,7 @@ function typeCardHeight(type) {
 
 function renderTypeCard(type, x, y, w) {
   const h = typeCardHeight(type);
-  let out = `<g${nodeAttrs(type.id, type.name, { class: 'node type-card', kind: `type-${type.kind || 'object'}` })}>`;
+  let out = `<g${nodeAttrs(type.id, type.name, { class: 'node type-card', kind: `type-${type.kind || 'object'}`, at: { x, y } })}>`;
   out += `<title>${esc(type.name)}${type.description ? ` — ${esc(type.description)}` : ''}</title>`;
   out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${TYPE_HEAD_H - 8} h${-w} z"/>`;
@@ -156,27 +157,35 @@ export function renderEndpoints(spec) {
   if (subtitleBits.length) { body += svgText(MARGIN, y + 4, subtitleBits.join('  ·  '), { cls: 'watermark', mono: true }); y += 16; }
 
   const groupLayout = masonry(nonEmpty, (g) => groupCardHeight(byGroup.get(g.id), withSummary), columns, cardW, MARGIN, y);
-  for (const p of groupLayout.placed) body += renderGroupCard(p.item, byGroup.get(p.item.id), p.x, p.y, cardW, withSummary).svg;
-  y = groupLayout.bottom;
-
+  const typeY = groupLayout.bottom + 56;
   const types = spec.types || [];
-  if (types.length && layout.show_types !== false) {
-    y += 56;
-    body += svgText(MARGIN, y - 18, `Types (${types.length})`, { cls: 'section-title' });
-    const typeCols = Math.max(columns, Math.min(4, Math.ceil(types.length / 3)));
-    const typeW = Math.floor((columns * cardW + (columns - 1) * GAP - (typeCols - 1) * GAP) / typeCols);
-    const typeLayout = masonry(types, typeCardHeight, typeCols, typeW, MARGIN, y);
+  const showTypes = types.length && layout.show_types !== false;
+  const typeCols = Math.max(columns, Math.min(4, Math.ceil(types.length / 3)));
+  const typeW = Math.floor((columns * cardW + (columns - 1) * GAP - (typeCols - 1) * GAP) / typeCols);
+  const typeLayout = showTypes ? masonry(types, typeCardHeight, typeCols, typeW, MARGIN, typeY) : { placed: [] };
+
+  // Cards are the boxes here; an endpoint row moves with its card.
+  const cardOf = (w) => (p) => [p.item.id, { id: p.item.id, x: p.x, y: p.y, w, h: p.h }];
+  const cards = new Map([...groupLayout.placed.map(cardOf(cardW)), ...typeLayout.placed.map(cardOf(typeW))]);
+  const warnings = pinPositions(cards, layout.positions);
+  for (const p of [...groupLayout.placed, ...typeLayout.placed]) { const c = cards.get(p.item.id); p.x = c.x; p.y = c.y; }
+
+  for (const p of groupLayout.placed) body += renderGroupCard(p.item, byGroup.get(p.item.id), p.x, p.y, cardW, withSummary).svg;
+  if (showTypes) {
+    body += svgText(MARGIN, typeY - 18, `Types (${types.length})`, { cls: 'section-title' });
     for (const p of typeLayout.placed) body += renderTypeCard(p.item, p.x, p.y, typeW).svg;
-    y = typeLayout.bottom;
   }
 
-  const width = MARGIN * 2 + columns * cardW + (columns - 1) * GAP;
-  const height = y + MARGIN;
+  const placedCards = [...cards.values()];
+  const right = Math.max(MARGIN + columns * cardW + (columns - 1) * GAP, ...placedCards.map((c) => c.x + c.w));
+  const bottom = Math.max(showTypes ? typeY : groupLayout.bottom, ...placedCards.map((c) => c.y + c.h));
+  const width = right + MARGIN;
+  const height = bottom + MARGIN;
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
   const svg = wrapSvg({ body, width, height, title: spec.meta.title, theme, diagramType: 'endpoints', proposed: spec.meta.proposed === true });
   const present = new Set(spec.endpoints.map((e) => e.method));
   const legend = METHOD_ORDER.filter((m) => present.has(m)).map((m) => ({ label: m, style: `background:var(--${m === 'HEAD' || m === 'OPTIONS' ? 'other' : m.toLowerCase()})` }));
   if (spec.endpoints.some((e) => e.auth && e.auth !== 'none')) legend.push({ label: '🔒 auth required', className: 'text' });
   if (spec.endpoints.some((e) => e.deprecated)) legend.push({ label: 'struck = deprecated', className: 'text' });
-  return { svg, legend, width, height, warnings: [], syntheticGroups };
+  return { svg, legend, width, height, warnings, syntheticGroups };
 }

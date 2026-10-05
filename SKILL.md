@@ -199,6 +199,16 @@ Issues labelled `intake` come from someone reading a diagram or a document. Read
 
 Whatever you do, open a pull request and let the drift check run on it. Nothing here merges on its own.
 
+### Saving a layout someone dragged
+
+A `layout` issue, or JSON pasted to you from "Save layout", carries `{ "spec", "positions" }`.
+
+1. Save it to a file (the whole issue body is fine).
+2. `node bin/vibex.mjs layout <spec file> <that file>`. It merges into `layout.positions` and skips ids the spec no longer has.
+3. Re-render that spec. Change nothing else.
+
+Never hand-edit positions to "tidy" a layout someone saved: they placed it on purpose. `--clear` drops every pin, only when asked.
+
 ### Wiring it into CI
 
 Add this once, in the project being documented. It is the step that makes the rest binding rather than advisory — without it a stale claim is a warning nobody reads.
@@ -232,6 +242,31 @@ Regenerate and re-paste rather than editing the Markdown: it is an output, and a
 ### Report
 
 Give the counts line verbatim (`N claims — X verified, …`), every `coverage.unknown` entry, and which claims you anchored versus which the user asserted. If you left something undocumented, say so — it should already be in `out_of_scope`. When the document came out of a conversation, list what you attributed to them by name, so they can correct it before it hardens into documentation.
+
+## Service links (`links`)
+
+Use when the system is more than one service: "how do these services talk", "what calls the order API", "map the microservices". One `*.links.json` records every call between services, anchored on both ends.
+
+1. **Find the clients** in each service: HTTP/GraphQL client classes (Feign, axios/HttpService, a shared request wrapper), and the env var holding the base URL (`*_SERVICE_URL`).
+2. **Find each call's handler** in the target repo: the controller or resolver method serving that route.
+3. **Write one link per call:** `from`, `to`, `kind`, `route`, `env`, and `client` + `handler` anchors. Anchor the method, not the file. Hashes are `"000000000000"`.
+4. **Pin and check:**
+   ```bash
+   node bin/vibex.mjs links docs/arch/system.links.json docs/arch \
+     --repo bff=../bff --repo orders=../orders --reanchor
+   node bin/vibex.mjs links docs/arch/system.links.json docs/arch --repo bff=../bff --repo orders=../orders --check
+   ```
+   Monorepo: drop `services[].repo`, use root-relative paths, pass one `--repo .`.
+5. **Show it:** `render system.links.json` draws the System view; `dashboard` puts it first.
+
+Rules:
+- Only write a link you found on both ends. One end only is a finding: report it, don't invent the other side.
+- A third party (Stripe, a supplier) is a service with `"external": true`; its side needs no anchor.
+- Set `services[].spec` to the service's endpoints spec id: `vibex links` then lists endpoints nothing calls. Hide health/docs routes with `services[].ignore: ["/actuator/**"]`.
+- One templated call (`/items/${kind}`) that reaches several endpoints: give `endpoint` a list.
+- Map each service to its C4 elements: `services[].c4: ["shop.c4#order_api"]`. `vibex links` then reports arrows with no call behind them, calls with no arrow, and neighbours a diagram leaves out. Fix the C4, not the links.
+- Put ids one service owns and others store (`orderId`, `customerId`) in `shared_ids`.
+- Give every spec a unique `meta.id` (`orders.endpoints`, not `api.endpoints`). Same-named files in two services otherwise collide.
 
 ## Release notes (`changelog`)
 
@@ -281,6 +316,12 @@ docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo dir]
                   and a computed confidence. --check exits 1 on stale/broken/expired.
                   --md also writes the document as Markdown. Re-reads only the anchors
                   git says moved since the commit in the lock file.
+mermaid <spec.json> [out.mmd]
+                  the diagram as Mermaid (erDiagram, flowchart, stateDiagram-v2)
+layout <spec.json> <layout.json|-> [--replace] [--clear]
+                  write positions saved in the viewer into layout.positions
+links <links.json> [spec dirs...] --repo [name=]dir... [--check] [--reanchor] [--json]
+                  check every service-to-service call against the code on both ends
 demo [dir] [--linked]  render examples/ into dir (+ dashboard.html)
 --linked          write the HTML as a placeholder page: data in <name>.data.js, viewer in
                   vibex-viewer.js/.css beside it. Opens from disk; keep the files together.
@@ -303,4 +344,4 @@ YAML OpenAPI needs the optional `yaml` package: run `npm install` inside the ski
 
 ## Viewer
 
-Click a node for details (columns, fields, params, sources, relationships). `/` searches, `Esc` clears, `t` toggles theme, `0` fits, `+`/`-` zoom. Dragging a box moves it (a C4 boundary or an endpoint card carries what is inside it) and re-routes its lines; the layout lives in memory until reload, `r` or Reset layout puts it back. `#node=<id>` in the URL deep-links to a node. SVG and PNG export buttons produce standalone files in the current theme.
+Click a node for details (columns, fields, params, sources, relationships). `/` searches, `Esc` clears, `t` toggles theme, `0` fits, `+`/`-` zoom. Dragging a box moves it (a C4 boundary or an endpoint card carries what is inside it) and re-routes its lines; the layout lives in memory until reload, `r` or Reset layout puts it back. `s` or Save layout hands back a prompt for an agent, the JSON, or a prefilled `layout` issue, for `vibex layout` to write into `layout.positions`. `#node=<id>` in the URL deep-links to a node. SVG and PNG export buttons produce standalone files in the current theme; Mermaid downloads the `.mmd`. `render` always writes `<name>.mmd` beside the HTML: when the user wants the diagram inside a README, PR or wiki page, paste that (in a ```` ```mermaid ```` fence) rather than linking the HTML.

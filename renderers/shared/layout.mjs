@@ -419,3 +419,82 @@ export function placeLabel(points, lw, lh, obstacles) {
   }
   return best ? best.box : boxAt(0.5, 0);
 }
+
+// Does an axis-aligned segment pass through a box's interior?
+function segmentHits(p, q, r) {
+  const x0 = Math.min(p[0], q[0]); const x1 = Math.max(p[0], q[0]);
+  const y0 = Math.min(p[1], q[1]); const y1 = Math.max(p[1], q[1]);
+  return x1 > r.x + 1 && x0 < r.x + r.w - 1 && y1 > r.y + 1 && y0 < r.y + r.h - 1;
+}
+
+export function routeHits(points, boxes) {
+  return boxes.filter((r) => points.some((p, i) => i > 0 && segmentHits(points[i - 1], p, r)));
+}
+
+// A route that crosses a box other than its own two ends goes around it:
+// out of the start side, along a lane just past the blocking boxes, and back
+// in. Tries the lane nearer the straight line first.
+export function detour(points, boxes, gap = 18) {
+  let blockers = routeHits(points, boxes);
+  if (!blockers.length || points.length < 2) return points;
+  const s = points[0]; const e = points[points.length - 1];
+  const horizontal = s[1] === points[1][1];
+  const a = horizontal ? 0 : 1; const b = 1 - a;
+  const dir = Math.sign(e[a] - s[a]) || 1;
+  const t1 = s[a] + dir * gap; const t2 = e[a] - dir * gap;
+  const mid = (s[b] + e[b]) / 2;
+  const build = (lane) => {
+    const pt = (u, v) => (horizontal ? [u, v] : [v, u]);
+    return dedupe([s, pt(t1, s[b]), pt(t1, lane), pt(t2, lane), pt(t2, e[b]), e]);
+  };
+  let best = points;
+  let fewest = blockers.length;
+  for (let tries = 0; tries < 4; tries += 1) {
+    const lo = Math.min(...blockers.map((r) => (horizontal ? r.y : r.x))) - gap;
+    const hi = Math.max(...blockers.map((r) => (horizontal ? r.y + r.h : r.x + r.w))) + gap;
+    const lanes = Math.abs(lo - mid) <= Math.abs(hi - mid) ? [lo, hi] : [hi, lo];
+    let grown = null;
+    for (const lane of lanes) {
+      const candidate = build(lane);
+      const hits = routeHits(candidate, boxes);
+      if (!hits.length) return candidate;
+      if (hits.length < fewest) { best = candidate; fewest = hits.length; }
+      grown = grown || hits;
+    }
+    blockers = [...new Set([...blockers, ...grown])];
+  }
+  return best;
+}
+
+// Moves boxes to where layout.positions pinned them ([x, y] = top-left). If a
+// pin lands left of or above the auto layout's origin, everything shifts so
+// nothing falls off the canvas. Returns the overlap warnings.
+export function pinPositions(rects, positions) {
+  if (!positions || typeof positions !== 'object') return [];
+  const all = [...rects.values()];
+  if (!all.length) return [];
+  const floorX = Math.min(...all.map((r) => r.x));
+  const floorY = Math.min(...all.map((r) => r.y));
+  const pinned = new Set();
+  for (const [id, p] of Object.entries(positions)) {
+    const r = rects.get(id);
+    if (!r || !Array.isArray(p) || !p.every(Number.isFinite)) continue;
+    r.x = p[0]; r.y = p[1];
+    pinned.add(id);
+  }
+  if (!pinned.size) return [];
+  const dx = Math.max(0, floorX - Math.min(...all.map((r) => r.x)));
+  const dy = Math.max(0, floorY - Math.min(...all.map((r) => r.y)));
+  if (dx || dy) for (const r of all) { r.x += dx; r.y += dy; }
+  const warnings = [];
+  for (const id of pinned) {
+    const a = rects.get(id);
+    for (const [other, b] of rects) {
+      if (other === id || (pinned.has(other) && other < id)) continue;
+      if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+        warnings.push(`pinned box "${id}" overlaps "${other}"; move one of them in the viewer and save again`);
+      }
+    }
+  }
+  return warnings;
+}

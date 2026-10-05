@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "diagram_type": "links",
+  "meta": {
+    "id": "shop.links",
+    "title": "How the shop services talk",
+    "subtitle": "Every call between services, anchored on both ends"
+  },
+  "services": [
+    { "id": "bff", "label": "BFF", "repo": "bff", "c4": ["shop.c4#bff"] },
+    { "id": "order_api", "label": "Order API", "repo": "order-api", "spec": "shop.endpoints", "c4": ["shop.c4#order_api"] },
+    { "id": "stripe", "label": "Stripe", "external": true, "c4": ["shop.c4#stripe"] }
+  ],
+  "links": [
+    {
+      "id": "bff-list-orders",
+      "from": "bff",
+      "to": "order_api",
+      "kind": "http",
+      "route": "GET /orders",
+      "env": "ORDER_API_URL",
+      "endpoint": "shop.endpoints#list-orders",
+      "client": { "path": "src/orders/orders.client.ts", "symbol": "listOrders", "line": 13, "end_line": 15, "hash": "96b21191949e" },
+      "handler": { "path": "src/orders/orders.controller.ts", "symbol": "listOrders", "line": 10, "end_line": 13, "hash": "7d2f6abf5244" }
+    },
+    {
+      "id": "bff-create-order",
+      "from": "bff",
+      "to": "order_api",
+      "kind": "http",
+      "route": "POST /orders",
+      "env": "ORDER_API_URL",
+      "endpoint": "shop.endpoints#create-order",
+      "client": { "path": "src/orders/orders.client.ts", "symbol": "createOrder", "line": 17, "end_line": 19, "hash": "98beb91daa66" },
+      "handler": { "path": "src/orders/orders.controller.ts", "symbol": "createOrder", "line": 15, "end_line": 18, "hash": "8ecac0abb1d7" }
+    },
+    {
+      "id": "bff-cancel-order",
+      "from": "bff",
+      "to": "order_api",
+      "kind": "http",
+      "route": "POST /orders/{id}/cancel",
+      "env": "ORDER_API_URL",
+      "endpoint": "shop.endpoints#cancel-order",
+      "client": { "path": "src/orders/orders.client.ts", "symbol": "cancelOrder", "line": 21, "end_line": 23, "hash": "ef7d3b3cacee" },
+      "handler": { "path": "src/orders/orders.controller.ts", "symbol": "cancelOrder", "line": 20, "end_line": 23, "hash": "e496be90391a" }
+    },
+    {
+      "id": "order-api-charge",
+      "from": "order_api",
+      "to": "stripe",
+      "kind": "http",
+      "route": "POST /v1/payment_intents",
+      "client": { "path": "src/payments/stripe.client.ts", "symbol": "charge", "line": 8, "end_line": 10, "hash": "ef7c3fe1ed80" }
+    },
+    {
+      "id": "stripe-webhook",
+      "from": "stripe",
+      "to": "order_api",
+      "kind": "webhook",
+      "route": "POST /webhooks/stripe",
+      "endpoint": "shop.endpoints#stripe-webhook",
+      "handler": { "path": "src/payments/stripe-webhook.controller.ts", "symbol": "handle", "line": 10, "end_line": 23, "hash": "390232fa244c" }
+    }
+  ],
+  "shared_ids": [
+    { "id": "order-id", "label": "orderId", "owner": "order_api", "used_by": ["bff"], "refs": ["orders.erd#order"] }
+  ],
+  "layout": {
+    "positions": {
+      "bff": [49, -183],
+      "order_api": [136, 122],
+      "stripe": [700, -156]
+    }
+  }
+}

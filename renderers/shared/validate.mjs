@@ -41,6 +41,9 @@ export const ENUMS = {
       'coverage',
     ],
   },
+  links: {
+    kind: ['http', 'graphql', 'grpc', 'event', 'webhook'],
+  },
   common: {
     theme: ['light', 'dark', 'auto'],
     tone: ['neutral', 'info', 'success', 'warning', 'danger'],
@@ -83,6 +86,23 @@ function checkLayout(report, layout, fields) {
     if (typeof v !== 'number' || !Number.isFinite(v)) { report.error('type', `${at} must be a number (got ${JSON.stringify(v)})`, at); continue; }
     if (rule === 'integer' && (!Number.isInteger(v) || v < 1)) report.error('range', `${at} must be an integer >= 1`, at);
     if (rule === 'number' && v < 0) report.error('range', `${at} must be >= 0`, at);
+  }
+}
+
+// layout.positions pins boxes where someone dragged them: id -> [x, y], the
+// box's top-left corner. A pin for an id that no longer exists is stale, not
+// wrong, so it only warns.
+const MAX_COORD = 100000;
+export function checkPositions(report, layout, knownIds) {
+  if (!isObj(layout) || layout.positions === undefined) return;
+  const at = 'layout.positions';
+  if (!isObj(layout.positions)) { report.error('type', `${at} must be an object of id -> [x, y]`, at); return; }
+  for (const [id, p] of Object.entries(layout.positions)) {
+    if (!Array.isArray(p) || p.length !== 2 || !p.every((v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= MAX_COORD)) {
+      report.error('type', `${at}.${id} must be [x, y] numbers (got ${JSON.stringify(p)})`, at);
+    } else if (!knownIds.has(id)) {
+      report.warn('stale-position', `${at}.${id} pins a box that is not in this diagram; drop it or run "vibex layout" again`, at);
+    }
   }
 }
 
@@ -186,6 +206,7 @@ export function validateErd(spec, report = new Report()) {
   if (!Array.isArray(spec.entities) || !spec.entities.length) { report.error('missing', 'entities must be a non-empty array', 'entities'); return report; }
   const entityIds = checkIds(report, spec.entities, 'entities');
   checkCells(report, spec.entities, 'entities');
+  checkPositions(report, spec.layout, entityIds);
   spec.entities.forEach((e, i) => {
     const at = `entities[${i}]`;
     if (!isObj(e)) { report.error('type', `${at} must be an object`, at); return; }
@@ -269,6 +290,7 @@ export function validateC4(spec, report = new Report()) {
   if (!Array.isArray(spec.elements) || !spec.elements.length) { report.error('missing', 'elements must be a non-empty array', 'elements'); return report; }
   const elementIds = checkIds(report, spec.elements, 'elements');
   checkCells(report, spec.elements, 'elements');
+  checkPositions(report, spec.layout, elementIds);
   spec.elements.forEach((e, i) => {
     const at = `elements[${i}]`;
     if (!isObj(e)) { report.error('type', `${at} must be an object`, at); return; }
@@ -372,6 +394,10 @@ export function validateEndpoints(spec, report = new Report()) {
     }
   }
   const endpointIds = checkIds(report, spec.endpoints, 'endpoints');
+  // Endpoints move with their card, so only cards (and the "Other" card) pin.
+  const cardIds = new Set([...groupIds, ...typeIds]);
+  if (spec.endpoints.some((e) => !e.group || !groupIds.has(e.group))) cardIds.add('default');
+  checkPositions(report, spec.layout, cardIds);
   for (const id of endpointIds) {
     if (groupIds.has(id) || typeIds.has(id)) report.error('id-clash', `endpoint id "${id}" clashes with a group or type id`, 'endpoints');
   }
@@ -408,6 +434,7 @@ export function validateLifecycle(spec, report = new Report()) {
   if (!Array.isArray(spec.states) || !spec.states.length) { report.error('missing', 'states must be a non-empty array', 'states'); return report; }
   const stateIds = checkIds(report, spec.states, 'states');
   checkCells(report, spec.states, 'states');
+  checkPositions(report, spec.layout, stateIds);
   spec.states.forEach((s, i) => {
     const at = `states[${i}]`;
     if (!isObj(s)) { report.error('type', `${at} must be an object`, at); return; }
@@ -465,6 +492,26 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Hedges, instructions, and history are not claims about what the system IS.
 const NOT_A_CLAIM = /\b(should|probably|might|maybe|we used to|will be|TODO|TBD)\b/i;
 
+function checkAnchorShape(report, src, at) {
+  if (typeof src.path !== 'string' || !src.path) report.error('missing', `${at}.path is required`, at);
+  else if (src.path.startsWith('/') || src.path.startsWith('\\') || SCHEME_RE.test(src.path) || src.path.split(/[\\/]/).some((seg) => seg === '..')) {
+    report.error('path', `${at}.path must be repo-relative (no leading slash, drive letter, scheme, or ".." segment)`, at);
+  }
+  if (typeof src.hash !== 'string' || !HASH_RE.test(src.hash)) {
+    report.error('hash', `${at}.hash must be 12 lowercase hex characters; write "000000000000" and run --reanchor to compute it`, at);
+  }
+  for (const k of ['line', 'end_line']) {
+    if (src[k] !== undefined && (!Number.isInteger(src[k]) || src[k] < 1)) report.error('range', `${at}.${k} must be an integer >= 1`, at);
+  }
+  if (Number.isInteger(src.line) && Number.isInteger(src.end_line) && src.end_line < src.line) {
+    report.error('range', `${at}.end_line is before line`, at);
+  }
+  if (src.hash_mode !== undefined) checkEnum(report, src.hash_mode, ENUMS.docs.hashMode, `${at}.hash_mode`, false);
+  if (src.hash_mode === 'loose' && isWhitespaceSignificant(src.path)) {
+    report.warn('loose-hash', `${at}.hash_mode is "loose" on ${src.path}, where indentation is syntax: re-nesting a line will not flag this claim. Drop the override unless the anchored lines cannot change meaning by indentation.`, at);
+  }
+}
+
 function checkClaimSource(report, src, at) {
   if (!isObj(src)) { report.error('missing', `${at}.source is required`, at); return; }
   if (src.kind === 'derived') {
@@ -473,25 +520,8 @@ function checkClaimSource(report, src, at) {
   }
   checkEnum(report, src.kind, ENUMS.docs.sourceKind, `${at}.source.kind`, false);
 
-  if (src.kind === 'anchored') {
-    if (typeof src.path !== 'string' || !src.path) report.error('missing', `${at}.source.path is required`, at);
-    else if (src.path.startsWith('/') || src.path.startsWith('\\') || SCHEME_RE.test(src.path) || src.path.split(/[\\/]/).some((seg) => seg === '..')) {
-      report.error('path', `${at}.source.path must be repo-relative (no leading slash, drive letter, scheme, or ".." segment)`, at);
-    }
-    if (typeof src.hash !== 'string' || !HASH_RE.test(src.hash)) {
-      report.error('hash', `${at}.source.hash must be 12 lowercase hex characters; run "vibex docs --reanchor" to compute it`, at);
-    }
-    for (const k of ['line', 'end_line']) {
-      if (src[k] !== undefined && (!Number.isInteger(src[k]) || src[k] < 1)) report.error('range', `${at}.source.${k} must be an integer >= 1`, at);
-    }
-    if (Number.isInteger(src.line) && Number.isInteger(src.end_line) && src.end_line < src.line) {
-      report.error('range', `${at}.source.end_line is before line`, at);
-    }
-    if (src.hash_mode !== undefined) checkEnum(report, src.hash_mode, ENUMS.docs.hashMode, `${at}.source.hash_mode`, false);
-    if (src.hash_mode === 'loose' && isWhitespaceSignificant(src.path)) {
-      report.warn('loose-hash', `${at}.source.hash_mode is "loose" on ${src.path}, where indentation is syntax: re-nesting a line will not flag this claim. Drop the override unless the anchored lines cannot change meaning by indentation.`, at);
-    }
-  } else if (src.kind === 'asserted') {
+  if (src.kind === 'anchored') checkAnchorShape(report, src, `${at}.source`);
+  else if (src.kind === 'asserted') {
     if (typeof src.by !== 'string' || !src.by.trim()) report.error('missing', `${at}.source.by is required: name who stands behind this`, at);
     if (typeof src.at !== 'string' || !DATE_RE.test(src.at)) report.error('date', `${at}.source.at must be an ISO date (YYYY-MM-DD) saying when this was last confirmed true`, at);
     else if (Number.isNaN(Date.parse(src.at))) report.error('date', `${at}.source.at is not a real date`, at);
@@ -611,7 +641,73 @@ function validateDocs(spec, report) {
   return report;
 }
 
-const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, docs: validateDocs };
+const NODE_REF_RE = /^[a-zA-Z][a-zA-Z0-9_.-]*#[a-zA-Z][a-zA-Z0-9_.-]*$/;
+
+function validateLinks(spec, report) {
+  checkCommon(report, spec);
+  if (!Array.isArray(spec.services) || spec.services.length < 2) { report.error('missing', 'services must list at least two services', 'services'); return report; }
+  const serviceIds = checkIds(report, spec.services, 'services');
+  checkLayout(report, spec.layout, {});
+  checkPositions(report, spec.layout, serviceIds);
+  const external = new Set();
+  spec.services.forEach((svc, i) => {
+    const at = `services[${i}]`;
+    if (!isObj(svc)) return;
+    if (typeof svc.label !== 'string' || !svc.label.trim()) report.error('missing', `${at}.label is required`, at);
+    if (svc.external !== undefined && typeof svc.external !== 'boolean') report.error('type', `${at}.external must be true or false`, at);
+    if (svc.external) external.add(svc.id);
+    if (svc.repo !== undefined && (typeof svc.repo !== 'string' || !ID_RE.test(svc.repo))) report.error('id', `${at}.repo must match ${ID_RE}`, at);
+    if (svc.spec !== undefined && (typeof svc.spec !== 'string' || !ID_RE.test(svc.spec))) report.error('id', `${at}.spec must be the id of this service's endpoints spec`, at);
+    if (svc.c4 !== undefined && (!Array.isArray(svc.c4) || !svc.c4.every((r) => typeof r === 'string' && NODE_REF_RE.test(r)))) report.error('ref', `${at}.c4 must list "<c4 spec id>#<element id>" refs`, at);
+    if (svc.ignore !== undefined && (!Array.isArray(svc.ignore) || !svc.ignore.every((g) => typeof g === 'string' && g.startsWith('/')))) report.error('type', `${at}.ignore must be a list of path patterns like "/actuator/**"`, at);
+  });
+  if (!Array.isArray(spec.links) || !spec.links.length) { report.error('missing', 'links must be a non-empty array', 'links'); return report; }
+  checkIds(report, spec.links, 'links');
+  const seen = new Set();
+  spec.links.forEach((l, i) => {
+    const at = `links[${i}]`;
+    if (!isObj(l)) { report.error('type', `${at} must be an object`, at); return; }
+    for (const end of ['from', 'to']) {
+      if (!serviceIds.has(l[end])) report.error('dangling-ref', `${at}.${end} "${l[end]}" is not a service id${listIds(serviceIds)}`, at);
+    }
+    if (l.from === l.to) report.error('self-link', `${at} links ${l.from} to itself; in-process calls are not links`, at);
+    checkEnum(report, l.kind, ENUMS.links.kind, `${at}.kind`, false);
+    if (typeof l.route !== 'string' || !l.route.trim()) report.error('missing', `${at}.route is required, e.g. "POST /orders" or "mutation createOrder"`, at);
+    for (const [side, owner] of [['client', l.from], ['handler', l.to]]) {
+      if (l[side] === undefined) {
+        if (!external.has(owner)) report.error('missing', `${at}.${side} is required: anchor the code on the ${owner} side, or mark ${owner} external`, at);
+        continue;
+      }
+      if (!isObj(l[side])) { report.error('type', `${at}.${side} must be an anchor object`, at); continue; }
+      checkAnchorShape(report, l[side], `${at}.${side}`);
+      if (l[side].repo !== undefined && (typeof l[side].repo !== 'string' || !ID_RE.test(l[side].repo))) report.error('id', `${at}.${side}.repo must match ${ID_RE}`, at);
+    }
+    if (l.endpoint !== undefined) {
+      const refs = Array.isArray(l.endpoint) ? l.endpoint : [l.endpoint];
+      if (!refs.length || !refs.every((r) => typeof r === 'string' && NODE_REF_RE.test(r))) report.error('ref', `${at}.endpoint must be "<spec id>#<endpoint id>" or a list of them`, at);
+    }
+    const key = `${l.from} ${l.to} ${l.route}`;
+    if (seen.has(key)) report.warn('duplicate-link', `${l.from} → ${l.to} ${l.route} appears more than once`, at);
+    seen.add(key);
+  });
+  if (spec.shared_ids !== undefined) {
+    if (!Array.isArray(spec.shared_ids)) report.error('type', 'shared_ids must be an array', 'shared_ids');
+    else {
+      checkIds(report, spec.shared_ids, 'shared_ids');
+      spec.shared_ids.forEach((s, i) => {
+        const at = `shared_ids[${i}]`;
+        if (!isObj(s)) return;
+        if (!serviceIds.has(s.owner)) report.error('dangling-ref', `${at}.owner "${s.owner}" is not a service id${listIds(serviceIds)}`, at);
+        if (!Array.isArray(s.used_by) || !s.used_by.length) report.error('missing', `${at}.used_by must list the services that store or pass this id`, at);
+        else s.used_by.forEach((u) => { if (!serviceIds.has(u)) report.error('dangling-ref', `${at}.used_by "${u}" is not a service id`, at); });
+        for (const r of s.refs || []) if (typeof r !== 'string' || !NODE_REF_RE.test(r)) report.error('ref', `${at}.refs entries must be "<spec id>#<node id>"`, at);
+      });
+    }
+  }
+  return report;
+}
+
+const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, docs: validateDocs, links: validateLinks };
 
 // Types that render to a diagram. `docs` is a spec but not a diagram.
 export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle'];

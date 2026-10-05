@@ -28,7 +28,7 @@ const graph = docsSpecs.length
   : null;
 
 const parsed = parseIntake(body);
-const result = triage(parsed, { graph, specIds: new Set(specs.keys()), labels });
+const result = triage(parsed, { graph, specIds: new Set(specs.keys()), specs, labels, body });
 
 const reply = result.action === ACTIONS.ask
   ? result.reply

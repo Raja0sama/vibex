@@ -14,6 +14,7 @@ export const INTENTS = {
   'doc-problem': { label: 'Report a problem', labels: ['docs', 'intake'], lead: 'What is wrong:' },
   'spec-gap': { label: 'Something is missing', labels: ['spec', 'intake'], lead: 'What is missing:' },
   proposal: { label: 'Propose a change', labels: ['proposal', 'intake'], lead: 'What if:' },
+  layout: { label: 'Save a layout', labels: ['layout', 'intake'], lead: 'Please save this layout:' },
 };
 
 // GitHub and GitLab spell the query differently. Anything else gets no link at

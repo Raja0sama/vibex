@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "links.schema.json",
+  "title": "vibeX links: how services call each other",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "services", "links"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "links" },
+    "meta": { "$ref": "common.schema.json#/$defs/meta" },
+    "services": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "repo": { "type": "string", "description": "Name given to --repo name=dir. Omit in a monorepo and use root-relative paths." },
+          "spec": { "type": "string", "description": "Id of this service's endpoints spec. Lets vibex list endpoints nothing calls." },
+          "external": { "type": "boolean", "description": "Not your code (Stripe, a supplier). Its side of a link needs no anchor." },
+          "c4": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "\"<c4 spec id>#<element id>\" for every element that draws this service. Enables the C4 drift check."
+          },
+          "ignore": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Path patterns left out of \"nothing calls\": \"/actuator/**\", \"/swagger-ui/*\". * stays in one segment, ** crosses them."
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per call. In-process calls are not links.",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to", "kind", "route"],
+        "properties": {
+          "id": { "type": "string" },
+          "from": { "type": "string", "description": "Calling service id" },
+          "to": { "type": "string", "description": "Serving service id" },
+          "kind": { "enum": ["http", "graphql", "grpc", "event", "webhook"] },
+          "route": { "type": "string", "description": "What is called: \"POST /orders\", \"mutation createOrder\", a topic name" },
+          "env": { "type": "string", "description": "Config key holding the target address, e.g. ORDER_API_URL" },
+          "auth": { "type": "string", "description": "How the caller authenticates, in a few words" },
+          "note": { "type": "string" },
+          "endpoint": {
+            "description": "\"<spec id>#<endpoint id>\" in the target's endpoints spec, or a list when one templated call reaches several",
+            "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" }, "minItems": 1 }]
+          },
+          "client": { "$ref": "#/$defs/anchor", "description": "The calling code. Required unless `from` is external." },
+          "handler": { "$ref": "#/$defs/anchor", "description": "The code that serves it. Required unless `to` is external." }
+        }
+      }
+    },
+    "shared_ids": {
+      "type": "array",
+      "description": "Identifiers one service owns and others store or pass along.",
+      "items": {
+        "type": "object",
+        "required": ["id", "owner", "used_by"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string", "description": "The name in code, e.g. orderId" },
+          "owner": { "type": "string", "description": "Service that creates the id" },
+          "used_by": { "type": "array", "items": { "type": "string" } },
+          "refs": { "type": "array", "items": { "type": "string" }, "description": "\"<spec id>#<node id>\" where it lives, e.g. an ERD column's entity" }
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "positions": {
+          "type": "object",
+          "description": "Boxes pinned where someone dragged them in the viewer: id -> [x, y], the box's top-left corner. Written by \"vibex layout\" from the viewer's Save layout.",
+          "additionalProperties": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "anchor": {
+      "type": "object",
+      "required": ["path", "hash"],
+      "properties": {
+        "repo": { "type": "string", "description": "Overrides the service's repo" },
+        "path": { "type": "string", "description": "Path inside that repo" },
+        "symbol": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "hash": { "type": "string", "description": "Write \"000000000000\" and run vibex links --reanchor" },
+        "hash_mode": { "enum": ["exact", "loose"] }
+      }
+    }
+  }
+}

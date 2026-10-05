@@ -319,14 +319,22 @@ Hand it to a contractor, an auditor, or the new hire on their first morning. It'
 
 A PNG of a 40-table schema is a wall. This one you can interrogate:
 
-<kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>-</kbd> zoom · <kbd>r</kbd> reset layout · <kbd>Esc</kbd> clear
+<kbd>/</kbd> search · <kbd>t</kbd> theme · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>-</kbd> zoom · <kbd>r</kbd> reset layout · <kbd>s</kbd> save layout · <kbd>Esc</kbd> clear
 
-Drag any box to move it and its lines re-route to follow. The layout is yours until you
-reload the page, which puts everything back where it was generated.
+Drag any box to move it and its lines re-route around the other boxes. To keep it,
+click **Save layout**. The page writes nothing itself; pick one:
+
+1. **Copy prompt:** paste it to your coding agent. It carries the JSON and the steps.
+2. **Copy JSON:** save it to a file and run `vibex layout <spec.json> <file>`.
+3. **Raise an issue:** prefilled, when `meta.repository.url` is set. Intake applies it in a pull request.
+
+The positions land in the spec's `layout.positions`; every render after that draws the boxes there.
 
 Click any node for its columns, fields, params and relationships. `#node=<id>` deep-links
 to one specific table in one specific diagram — so you can send someone *the thing*, not
 "it's in the doc somewhere." SVG and PNG export produce standalone files in the current theme.
+**Mermaid** exports the diagram as `.mmd`, for Markdown that renders Mermaid (GitHub, GitLab, Notion).
+`vibex render` writes the `.mmd` beside every HTML it makes; `vibex mermaid <spec>` prints it.
 
 Set `meta.repository` and `sources: [{path, line}]` and every node links back to the exact
 line on GitHub or GitLab.

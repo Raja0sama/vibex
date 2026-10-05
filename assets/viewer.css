@@ -70,6 +70,7 @@ html[data-theme="dark"] .i-sun{display:block}
 html[data-theme="dark"] .i-moon{display:none}
 .type-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);padding:2px 7px;border-radius:5px;white-space:nowrap;line-height:1.5}
 .type-badge.erd{color:var(--pk);background:color-mix(in srgb,var(--pk) 12%,transparent);border-color:color-mix(in srgb,var(--pk) 25%,transparent)}
+.type-badge.links{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}
 .type-badge.c4{color:var(--system);background:color-mix(in srgb,var(--system) 12%,transparent);border-color:color-mix(in srgb,var(--system) 25%,transparent)}
 .type-badge.endpoints{color:var(--get);background:color-mix(in srgb,var(--get) 12%,transparent);border-color:color-mix(in srgb,var(--get) 25%,transparent)}
 .type-badge.lifecycle{color:var(--patch);background:color-mix(in srgb,var(--patch) 12%,transparent);border-color:color-mix(in srgb,var(--patch) 25%,transparent)}
@@ -171,7 +172,7 @@ svg .edge:focus-visible path.line{stroke:var(--accent);stroke-width:2.4}
 }
 @media (max-width:520px){
   .seg button span{display:none}
-  .seg button[data-role="zoom-fit"] span,.seg button[data-role="export-svg"] span,.seg button[data-role="export-png"] span{display:inline}
+  .seg button[data-role="zoom-fit"] span,.seg button[data-role="export-svg"] span,.seg button[data-role="export-png"] span,.seg button[data-role="export-mermaid"] span{display:inline}
   .field input{padding-right:10px}
   .field kbd{display:none}
 }
@@ -420,4 +421,11 @@ nav a[data-proposed] .t em{font-style:normal;font-size:10px;text-transform:upper
 svg.vibex [data-node-id]{cursor:grab}
 .canvas.moving,.canvas.moving svg.vibex [data-node-id]{cursor:grabbing}
 .canvas.moving svg.vibex{user-select:none}
-button[data-role="reset-layout"][hidden]{display:none}
+button[data-role="reset-layout"][hidden],button[data-role="save-layout"][hidden]{display:none}
+button[data-role="save-layout"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--border))}
+.details .save-actions{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.details .save-help{margin:0 0 12px;padding:0 0 0 16px;color:var(--text-2);font-size:12px;line-height:1.5}
+.details .save-help li{margin:0 0 5px}
+.details .save-help b{color:var(--text);font-weight:600}
+.details .save-actions .save-issue{display:inline-flex;align-items:center;padding:6px 11px;border:1px solid var(--accent);border-radius:var(--r);background:var(--accent);color:var(--surface);font-size:12.5px;font-weight:500}
+.details .save-json{font-family:var(--font-mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:8px 10px;margin:0;max-height:220px;overflow:auto;white-space:pre;user-select:all}
