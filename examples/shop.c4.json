@@ -37,6 +37,7 @@
     { "from": "order_api", "to": "events", "label": "Publishes", "technology": "SQS", "style": "dashed" },
     { "from": "events", "to": "worker", "label": "Consumes", "technology": "SQS", "style": "dashed" },
     { "from": "order_api", "to": "stripe", "label": "Charges cards", "technology": "HTTPS" },
+    { "from": "stripe", "to": "order_api", "label": "Sends payment webhooks", "technology": "HTTPS", "style": "dashed" },
     { "from": "worker", "to": "mail", "label": "Sends email", "technology": "HTTPS" }
   ],
   "cards": [

@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, wrapText, fitChars, num, cellIndex } from '../shared/utils.mjs';
-import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
+import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets, detour, pinPositions } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const MARGIN = 40;
@@ -66,7 +66,7 @@ function autoRanks(spec) {
 function renderState(state, rect, direction) {
   const { x, y, w, h } = rect;
   const kind = state.kind || 'normal';
-  let out = `<g${nodeAttrs(state.id, state.label, { class: `node lc-state ${kind}`, kind })}>`;
+  let out = `<g${nodeAttrs(state.id, state.label, { class: `node lc-state ${kind}`, kind, at: rect })}>`;
   const tip = [state.label, `[${kind}]`, state.description || '', state.actor ? `next: ${state.actor}` : ''].filter(Boolean).join(' · ');
   out += `<title>${esc(tip)}</title>`;
   if (kind === 'initial') {
@@ -125,6 +125,7 @@ function renderTransition(t, index, rects, offset, obstacles) {
   const a = rects.get(t.from); const b = rects.get(t.to);
   if (!a || !b) return { edge: '', labelSvg: '' };
   const route = t.from === t.to ? routeSelfLoop(a, offset.from) : routeOrthogonal(a, b, offset);
+  if (t.from !== t.to) route.points = detour(route.points, [...rects.entries()].filter(([id]) => id !== t.from && id !== t.to).map(([, r]) => r));
   const d = pathFromPoints(route.points, 10);
   const kind = t.kind || 'normal';
   const cls = `edge lc-transition ${kind}${kind === 'auto' || kind === 'timeout' ? ' dashed' : ''}`;
@@ -162,6 +163,7 @@ export function renderLifecycle(spec) {
     sizeOf,
   });
   const rects = placement.placed;
+  const warnings = pinPositions(rects, layout.positions);
   const transitions = spec.transitions || [];
   const offsets = portOffsets(transitions, rects, 20);
   // Transitions crossing the same gap otherwise all turn at its midpoint, which
@@ -193,5 +195,5 @@ export function renderLifecycle(spec) {
   if (transitions.some((t) => t.kind === 'auto' || t.kind === 'timeout')) legend.push({ label: 'Dashed = system / timeout', className: 'text', glyph: '⇢' });
   if (transitions.some((t) => t.kind === 'failure')) legend.push({ label: 'Red = failure path', className: 'text', glyph: '→', style: 'color:var(--lc-failure)' });
   legend.push({ label: 'actor: event [guard] / action', className: 'text', glyph: '' });
-  return { svg, legend, width, height, warnings: [] };
+  return { svg, legend, width, height, warnings };
 }

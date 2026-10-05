@@ -17,6 +17,7 @@
     "layout": {
       "type": "object",
       "properties": {
+        "positions": { "type": "object", "description": "Boxes pinned where someone dragged them in the viewer: id -> [x, y], the box's top-left corner. Written by \"vibex layout\" from the viewer's Save layout.", "additionalProperties": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } },
         "direction": { "enum": ["tb", "lr"], "description": "Rank flow: top-to-bottom or left-to-right. Default: lr when there are more than 4 ranks." },
         "gapX": { "type": "number", "minimum": 0, "default": 80 },
         "gapY": { "type": "number", "minimum": 0, "default": 90 }

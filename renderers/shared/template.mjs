@@ -34,7 +34,9 @@ export const TOOLBAR_ACTIONS = `<div class="tools">
       <div class="seg" role="group" aria-label="Export">
         <button type="button" data-role="export-svg" title="Download as SVG">${ICON.download}<span>SVG</span></button>
         <button type="button" data-role="export-png" title="Download as PNG"><span>PNG</span></button>
+        <button type="button" data-role="export-mermaid" title="Download as Mermaid (.mmd), for GitHub, GitLab, Notion and wikis"><span>Mermaid</span></button>
       </div>
+      <button type="button" data-role="save-layout" title="Keep the moved boxes where they are (s)" hidden>Save layout</button>
       <button type="button" data-role="reset-layout" title="Put moved boxes back (r)" hidden>Reset layout</button>
       <button type="button" class="icon" data-role="theme" title="Toggle light / dark (t)" aria-label="Toggle light or dark theme">${ICON.sun}${ICON.moon}</button>
     </div>`;

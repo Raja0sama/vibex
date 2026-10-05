@@ -74,6 +74,8 @@ export function nodeAttrs(id, label, extra = {}) {
     'data-node-id': id,
     'data-node-label': label,
     'data-node-kind': extra.kind,
+    // Top-left of the laid-out box: what the viewer saves as layout.positions.
+    'data-at': extra.at ? `${+extra.at.x.toFixed(2)} ${+extra.at.y.toFixed(2)}` : undefined,
     tabindex: 0,
     role: 'button',
     'aria-label': label,

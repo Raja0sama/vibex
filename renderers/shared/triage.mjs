@@ -6,7 +6,9 @@
 
 export const ACTIONS = { act: 'act', ask: 'ask', ignore: 'ignore' };
 
-const KNOWN_INTENTS = new Set(['doc-request', 'doc-problem', 'spec-gap', 'proposal']);
+import { parseLayout, checkLayoutAgainst } from './positions.mjs';
+
+const KNOWN_INTENTS = new Set(['doc-request', 'doc-problem', 'spec-gap', 'proposal', 'layout']);
 const BLOCK = /```vibex\s*\n([\s\S]*?)```/;
 
 // The context block is written by the page, but an issue body is public input:
@@ -31,7 +33,7 @@ const ask = (reason, question) => ({ action: ACTIONS.ask, reason, reply: questio
 
 // `graph` and `specIds` come from the build, so every reference is checked
 // against what actually exists rather than taken on trust.
-export function triage(parsed, { graph = null, specIds = new Set(), labels = [] } = {}) {
+export function triage(parsed, { graph = null, specIds = new Set(), specs = null, labels = [], body = '' } = {}) {
   const { intent, context, prose } = parsed;
 
   if (!intent && !labels.includes('intake')) {
@@ -40,6 +42,8 @@ export function triage(parsed, { graph = null, specIds = new Set(), labels = [] 
   if (!intent) {
     return ask('no intent', 'I could not tell what kind of request this is. Could you file it from one of the issue forms, or say whether you want something documented, something corrected, or something proposed?');
   }
+  // A layout issue is data, not prose: the page wrote all of it.
+  if (intent === 'layout') return triageLayout(context, body, { specIds, specs });
   if (prose.replace(/\s+/g, ' ').length < 15) {
     return ask('no prose', 'There is not enough here for me to act on. Could you say, in a sentence, what you were trying to find out or what looks wrong?');
   }
@@ -80,10 +84,28 @@ export function triage(parsed, { graph = null, specIds = new Set(), labels = [] 
   return { action: ACTIONS.act, reason: 'question stated', target: { kind: 'document' } };
 }
 
+function triageLayout(context, body, { specIds, specs }) {
+  const specId = context.spec ? String(context.spec).split('#')[0] : null;
+  if (!specId) return ask('no spec', 'Which diagram is this layout for? Saving it again from the viewer fills that in.');
+  if (specIds.size && !specIds.has(specId)) return ask('unknown spec', `I cannot find a spec called \`${specId}\`. Which diagram did you mean?`);
+  const layout = parseLayout(body);
+  if (!layout) return ask('no layout', 'I cannot find the saved layout in this issue. It should be a ```json block with "positions" in it, as "Save layout" writes it.');
+  const spec = specs?.get(specId);
+  if (spec) {
+    const { good, unknown, invalid } = checkLayoutAgainst(spec, layout);
+    if (!Object.keys(good).length) {
+      return ask('no known boxes', `None of the boxes in this layout are in \`${specId}\` any more${unknown.length ? ` (${unknown.slice(0, 5).join(', ')})` : ''}. It may have changed since the page was built: could you move them again and save from a fresh render?`);
+    }
+    return { action: ACTIONS.act, reason: 'layout resolved', target: { kind: 'layout', spec: specId, boxes: Object.keys(good).length, skipped: [...unknown, ...invalid] } };
+  }
+  return { action: ACTIONS.act, reason: 'layout found', target: { kind: 'layout', spec: specId } };
+}
+
 // What the agent is allowed to do for each intent. Nothing here merges.
 export const PLAYBOOK = {
   'doc-request': 'Author a new `*.docs.json`, or add a section to an existing one. Anchor what the code proves; ask before asserting anything in someone else’s name. Open a pull request.',
   'doc-problem': 'Re-read the code the claim points at. Still true → re-anchor. No longer true → rewrite it, or supersede it and say why. Open a pull request.',
   'spec-gap': 'Read the code, add the missing thing to the spec, re-render, and check that no claim about it went stale. Open a pull request.',
+  layout: 'Save the issue body to a file and run `node bin/vibex.mjs layout <the spec file> <that file>`; it merges the positions into `layout.positions` and skips ids the spec no longer has. Re-render that spec. Change nothing else. Open a pull request.',
   proposal: 'Author specs with `meta.proposed: true` and `meta.proposal` pointing back at this issue. Every claim is asserted, never anchored — there is no code. Put what the proposer has not worked out in `coverage.out_of_scope`. Open a pull request.',
 };

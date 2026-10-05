@@ -4,7 +4,16 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- **`links` spec + `vibex links`.** Record how services call each other: one entry per call, anchored on the client and the handler. `--repo name=dir` checks across several repos; `--check` fails CI when either end moves. Lists endpoints nothing calls (`services[].ignore` hides health routes; `endpoint` takes a list for templated calls). Checks C4 diagrams against the calls (`services[].c4`): arrows with no call, calls with no arrow, neighbours left out. Example: `examples/shop.links.json`.
+- **System view.** A links spec renders as a diagram (and leads the dashboard): services as boxes, one arrow per service pair labelled with its call count. Click an arrow for every route behind it.
+
+- **Save layout.** Moved boxes can now be kept. The viewer offers **Copy prompt** (for your coding agent), **Copy JSON**, or **Raise an issue** (prefilled, when `meta.repository.url` is set). `vibex layout <spec> <file>` writes it into `layout.positions`, and every render after that draws the boxes there. Intake triages `layout` issues and checks each box still exists.
+
+- **Mermaid export, for every diagram.** A Mermaid button on every page and dashboard panel, a `.mmd` beside every `vibex render`, and `vibex mermaid <spec>`. ERD becomes `erDiagram`, lifecycle `stateDiagram-v2`, C4 and the System view a flowchart with nested boundaries, endpoints a flowchart of groups and types.
+
+### Fixed
+- **Lines no longer cut through boxes.** In C4, ERD, lifecycle and System views, and while dragging, a line that would cross another box routes around it.
 
 ## [0.6.0] - 2026-09-26
 

@@ -11,6 +11,7 @@
     "layout": {
       "type": "object",
       "properties": {
+        "positions": { "type": "object", "description": "Boxes pinned where someone dragged them in the viewer: id -> [x, y], the box's top-left corner. Written by \"vibex layout\" from the viewer's Save layout.", "additionalProperties": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } },
         "cols": { "type": "integer", "minimum": 1, "description": "Grid columns for auto placement. Default ceil(sqrt(n))." },
         "gapX": { "type": "number", "minimum": 0, "default": 90 },
         "gapY": { "type": "number", "minimum": 0, "default": 70 }

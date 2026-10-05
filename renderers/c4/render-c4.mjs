@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, wrapText, fitChars, num, cellIndex } from '../shared/utils.mjs';
-import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
+import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets, detour, pinPositions } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const MARGIN = 40;
@@ -127,7 +127,7 @@ function renderElement(el, rect, cap) {
   const { x, y, w, h } = rect;
   const kind = el.kind;
   const cls = `node c4 ${kind}${el.external ? ' external' : ''}`;
-  let out = `<g${nodeAttrs(el.id, el.label, { class: cls, kind })}>`;
+  let out = `<g${nodeAttrs(el.id, el.label, { class: cls, kind, at: rect })}>`;
   const tip = [el.label, el.technology ? `[${el.technology}]` : '', el.description || ''].filter(Boolean).join(' — ');
   out += `<title>${esc(tip)}</title>`;
   const cx = x + w / 2;
@@ -202,6 +202,7 @@ function nearestOnPath(points, px, py) {
 function renderRelationship(rel, index, rects, offset, obstacles) {
   const a = rects.get(rel.from); const b = rects.get(rel.to);
   const route = rel.from === rel.to ? routeSelfLoop(a, offset.from) : routeOrthogonal(a, b, offset);
+  if (rel.from !== rel.to) route.points = detour(route.points, [...rects.entries()].filter(([id]) => id !== rel.from && id !== rel.to).map(([, r]) => r));
   const d = pathFromPoints(route.points, 10);
   const cls = `edge c4-rel${rel.style === 'dashed' ? ' dashed' : ''}`;
   const base = edgeAttrs(rel, index);
@@ -257,7 +258,7 @@ export function renderC4(spec) {
     align: hasBoundaries ? 'left' : 'center',
   });
   const rects = placement.placed;
-  const warnings = [];
+  const warnings = pinPositions(rects, layout.positions);
 
   // Silence is the failure mode this project exists to avoid: if text did not
   // fit, say which text, and where the whole of it can still be read.

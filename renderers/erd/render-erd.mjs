@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, fitChars, num } from '../shared/utils.mjs';
-import { gridPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets } from '../shared/layout.mjs';
+import { gridPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets, detour, pinPositions } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const ROW_H = 20;
@@ -39,7 +39,7 @@ function renderEntity(entity, rect) {
   const rows = rowsOf(entity);
   const { x, y, w, h } = rect;
   const kindTag = entity.kind && entity.kind !== 'table' ? entity.kind : (entity.schema || '');
-  let out = `<g${nodeAttrs(entity.id, entity.name, { class: `node erd-entity kind-${entity.kind || 'table'}`, kind: entity.kind || 'table' })}>`;
+  let out = `<g${nodeAttrs(entity.id, entity.name, { class: `node erd-entity kind-${entity.kind || 'table'}`, kind: entity.kind || 'table', at: rect })}>`;
   out += `<title>${esc(entity.name)}${entity.description ? ` — ${esc(entity.description)}` : ''}</title>`;
   out += `<rect class="box" filter="url(#m-shadow)" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
   out += `<path class="head" d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${HEAD_H - 8} h${-w} z"/>`;
@@ -79,6 +79,7 @@ function markerFor(cardinality) {
 function renderRelationship(rel, index, rects, offset, obstacles) {
   const a = rects.get(rel.from); const b = rects.get(rel.to);
   const route = rel.from === rel.to ? routeSelfLoop(a, offset.from) : routeOrthogonal(a, b, offset);
+  if (rel.from !== rel.to) route.points = detour(route.points, [...rects.entries()].filter(([id]) => id !== rel.from && id !== rel.to).map(([, r]) => r));
   const d = pathFromPoints(route.points, 10);
   const fromCard = rel.from_cardinality || 'many';
   const toCard = rel.to_cardinality || 'one';
@@ -148,7 +149,7 @@ export function renderErd(spec) {
     }
   }
   let body = '';
-  const warnings = [];
+  const warnings = pinPositions(rects, layout.positions);
 
   for (const g of groups) {
     const members = g.entities.map((id) => rects.get(id)).filter(Boolean);

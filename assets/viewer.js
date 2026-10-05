@@ -120,6 +120,41 @@
     if (out.length > 1) kept.push(out[out.length - 1]);
     return kept;
   }
+  function segmentHits(p, q, r) {
+    var x0 = Math.min(p[0], q[0]), x1 = Math.max(p[0], q[0]), y0 = Math.min(p[1], q[1]), y1 = Math.max(p[1], q[1]);
+    return x1 > r.x + 1 && x0 < r.x + r.w - 1 && y1 > r.y + 1 && y0 < r.y + r.h - 1;
+  }
+  function routeHits(points, boxes) {
+    return boxes.filter(function (r) { return points.some(function (p, i) { return i > 0 && segmentHits(points[i - 1], p, r); }); });
+  }
+  // Same as detour() in renderers/shared/layout.mjs: a line that crosses a
+  // box goes around it on the nearer side.
+  function detour(points, boxes, gap) {
+    gap = gap || 18;
+    var blockers = routeHits(points, boxes);
+    if (!blockers.length || points.length < 2) return points;
+    var s = points[0], e = points[points.length - 1];
+    var horizontal = s[1] === points[1][1];
+    var a = horizontal ? 0 : 1, b = 1 - a;
+    var dir = Math.sign(e[a] - s[a]) || 1;
+    var t1 = s[a] + dir * gap, t2 = e[a] - dir * gap, mid = (s[b] + e[b]) / 2;
+    function pt(u, v) { return horizontal ? [u, v] : [v, u]; }
+    function build(lane) { return dedupe([s, pt(t1, s[b]), pt(t1, lane), pt(t2, lane), pt(t2, e[b]), e]); }
+    var best = points, fewest = blockers.length;
+    for (var tries = 0; tries < 4; tries++) {
+      var lo = Math.min.apply(null, blockers.map(function (r) { return horizontal ? r.y : r.x; })) - gap;
+      var hi = Math.max.apply(null, blockers.map(function (r) { return horizontal ? r.y + r.h : r.x + r.w; })) + gap;
+      var lanes = Math.abs(lo - mid) <= Math.abs(hi - mid) ? [lo, hi] : [hi, lo], grown = null;
+      for (var i = 0; i < lanes.length; i++) {
+        var candidate = build(lanes[i]), hits = routeHits(candidate, boxes);
+        if (!hits.length) return candidate;
+        if (hits.length < fewest) { best = candidate; fewest = hits.length; }
+        grown = grown || hits;
+      }
+      blockers = blockers.concat(grown.filter(function (g) { return blockers.indexOf(g) === -1; }));
+    }
+    return best;
+  }
   function fmt(n) { return Math.round(n * 100) / 100; }
   function pathFromPoints(points, radius) {
     var segs = [];
@@ -220,6 +255,7 @@
     var boxes = {};
     var edgeCache = {};
     var resetBtn = root.querySelector('[data-role=reset-layout]');
+    var saveBtn = root.querySelector('[data-role=save-layout]');
     function isContainer(el) { var k = el.getAttribute('data-node-kind'); return k === 'boundary' || k === 'group'; }
     function boxOf(id) {
       if (boxes[id]) return boxes[id];
@@ -278,7 +314,8 @@
       }
       var a = currentBox(e.from), b = currentBox(e.to);
       if (!a || !b) return;
-      var pts = route(a, b, e.fromOff, e.toOff);
+      var others = nodeIds().filter(function (n) { return n !== e.from && n !== e.to && !isContainer(nodeEl(n)); }).map(currentBox).filter(Boolean);
+      var pts = detour(route(a, b, e.fromOff, e.toOff), others);
       e.g.removeAttribute('transform');
       setD(e, pathFromPoints(pts, 8));
       if (e.label && e.labelCenter) {
@@ -295,6 +332,7 @@
         if (touched[g.getAttribute('data-edge-from')] || touched[g.getAttribute('data-edge-to')]) redrawEdge(g.getAttribute('data-edge-id'));
       });
       if (resetBtn) resetBtn.hidden = !anyMoved();
+      if (saveBtn) saveBtn.hidden = !anyMoved();
     }
     function resetLayout() {
       var ids = Object.keys(moved);
@@ -310,6 +348,82 @@
       return [x0, y0, x1 - x0, y1 - y0];
     }
     if (resetBtn) resetBtn.addEventListener('click', resetLayout);
+
+    // ---------- saving a layout ----------
+    // The page never writes anywhere. It hands the positions back as JSON, for
+    // `vibex layout`, an agent, or an intake issue to put in layout.positions.
+    function savedLayout() {
+      var pinned = (spec.layout && spec.layout.positions) || {};
+      var positions = {};
+      all('[data-node-id][data-at]').forEach(function (el) {
+        var id = el.getAttribute('data-node-id');
+        var o = offsetOf(id);
+        if (!pinned[id] && !o[0] && !o[1]) return;
+        var at = el.getAttribute('data-at').split(' ').map(Number);
+        positions[id] = [Math.round(at[0] + o[0]), Math.round(at[1] + o[1])];
+      });
+      return { vibex_layout: 1, spec: (spec.meta && spec.meta.id) || null, positions: positions };
+    }
+    function specFileName() { return ((spec.meta && spec.meta.id) || safeName()) + '.json'; }
+    // For a coding agent: everything it needs, no file to pass around.
+    function layoutPrompt(pretty) {
+      return 'Save this vibeX layout. Someone moved boxes in the diagram viewer and wants them to stay there.\n\n'
+        + '1. Find the spec ' + specFileName() + ' (its meta.id, or else its file name, is "' + ((spec.meta && spec.meta.id) || safeName()) + '").\n'
+        + '2. Write the JSON below to a temporary file and run: npx @vibex/vibex layout <that spec> <the file>\n'
+        + '   It merges the positions into layout.positions and skips boxes the spec no longer has.\n'
+        + '3. Re-render that spec. Change nothing else.\n\n'
+        + '```json\n' + pretty + '\n```\n';
+    }
+    function layoutIssueUrl(json) {
+      var repo = spec.meta && spec.meta.repository;
+      var url = repo && String(repo.url || '');
+      if (!url || !/^https?:\/\/(www\.)?(github|gitlab)\.com\//i.test(url)) return null;
+      var clean = url.replace(/\/+$/, '').replace(/\.git$/, '');
+      var specId = (spec.meta && spec.meta.id) || spec.diagram_type;
+      var body = 'Please save this layout: I moved boxes in the viewer and want them to stay there.\n\n---\n\n'
+        + 'Context, filled in automatically. Leave it in — it is how this gets picked up.\n\n'
+        + '```vibex\nintent: layout\nspec: ' + specId + (repo.revision ? '\ncommit: ' + repo.revision : '') + '\n```\n\n'
+        + '```json\n' + json + '\n```';
+      // Past ~8k characters browsers and servers drop the URL.
+      if (body.length > 6000) return null;
+      var title = 'Save layout of ' + ((spec.meta && spec.meta.title) || specId);
+      return /gitlab\.com/i.test(url)
+        ? clean + '/-/issues/new?issue%5Btitle%5D=' + encodeURIComponent(title) + '&issue%5Bdescription%5D=' + encodeURIComponent(body)
+        : clean + '/issues/new?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body) + '&labels=layout,intake';
+    }
+    function showSave() {
+      clearSelection();
+      var layout = savedLayout();
+      var json = JSON.stringify(layout);
+      var ids = Object.keys(layout.positions);
+      var pretty = '{\n  "vibex_layout": 1,\n  "spec": ' + JSON.stringify(layout.spec) + ',\n  "positions": {'
+        + ids.map(function (id) { return '\n    ' + JSON.stringify(id) + ': [' + layout.positions[id].join(', ') + ']'; }).join(',')
+        + (ids.length ? '\n  ' : '') + '}\n}';
+      var issue = layoutIssueUrl(json);
+      var n = Object.keys(layout.positions).length;
+      var out = '<p class="d-title">Save this layout</p><p class="d-kind">' + n + ' pinned box' + (n === 1 ? '' : 'es') + '</p>'
+        + '<div class="save-actions">'
+        + '<button type="button" data-save="prompt">Copy prompt</button>'
+        + '<button type="button" data-save="json">Copy JSON</button>'
+        + (issue ? '<a class="save-issue" href="' + h(issue) + '" target="_blank" rel="noopener noreferrer">Raise an issue</a>' : '')
+        + '</div><ul class="save-help">'
+        + '<li><b>Copy prompt</b>: paste it to your coding agent.</li>'
+        + '<li><b>Copy JSON</b>: save it, then run <code>npx @vibex/vibex layout ' + h(specFileName()) + ' &lt;file&gt;</code></li>'
+        + (issue ? '<li><b>Raise an issue</b>: intake applies it in a pull request.</li>' : '')
+        + '</ul>'
+        + '<h4>JSON</h4><pre class="save-json">' + h(pretty) + '</pre>';
+      details.innerHTML = out;
+      function copier(role, text, label) {
+        details.querySelector('[data-save=' + role + ']').addEventListener('click', function (ev) {
+          var btn = ev.currentTarget;
+          function done(ok) { btn.textContent = ok ? 'Copied' : 'Copy failed: select the JSON below'; setTimeout(function () { btn.textContent = label; }, 1600); }
+          try { navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+        });
+      }
+      copier('prompt', layoutPrompt(pretty), 'Copy prompt');
+      copier('json', pretty, 'Copy JSON');
+    }
+    if (saveBtn) saveBtn.addEventListener('click', showSave);
 
     var drag = null;
     canvas.addEventListener('pointerdown', function (e) {
@@ -360,6 +474,9 @@
     bind('theme', toggleTheme);
     bind('export-svg', function () { download(new Blob([serialize()], { type: 'image/svg+xml' }), safeName() + '.svg'); });
     bind('export-png', exportPng);
+    bind('export-mermaid', function () {
+      if (spec.__mermaid) download(new Blob([spec.__mermaid], { type: 'text/plain;charset=utf-8' }), ((spec.meta && spec.meta.id) || safeName()) + '.mmd');
+    });
 
     // ---------- selection ----------
     function all(sel) { return Array.prototype.slice.call(svg.querySelectorAll(sel)); }
@@ -509,6 +626,7 @@
       if (item.entities) out += '<h4>Entities</h4>' + chips(item.entities, true);
       if (item.contains) out += '<h4>Contains</h4>' + chips(item.contains, true);
       if (item.tags) out += '<h4>Tags</h4>' + chips(item.tags);
+      if (item.calls) out += '<h4>Calls</h4>' + table(item.calls, ['route', 'kind', 'env']);
       if (c === 'entities' || c === 'elements' || c === 'states') {
         var touching = rels.filter(function (r) { return r.from === id || r.to === id; });
         if (touching.length) {
@@ -584,6 +702,7 @@
       else if (e.key === '0') fit();
       else if (e.key === 't') toggleTheme();
       else if (e.key === 'r' && anyMoved()) resetLayout();
+      else if (e.key === 's' && anyMoved()) showSave();
       else if (e.key === 'Enter' && document.activeElement && svg.contains(document.activeElement)) {
         var a = document.activeElement;
         if (a.hasAttribute('data-edge-id')) selectEdge(a.getAttribute('data-edge-id'));
@@ -630,6 +749,7 @@
     this.clear = clearSelection;
     this.fit = fit;
     this.resetLayout = resetLayout;
+    this.savedLayout = savedLayout;
     this.has = function (id) { return Boolean(index[id]); };
     this.spec = spec;
   }

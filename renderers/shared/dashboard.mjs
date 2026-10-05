@@ -12,8 +12,8 @@ import { renderChangelogPanel, changelogNavHtml } from '../changelog/render-chan
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DASHBOARD_TEMPLATE_PATH = path.resolve(here, '../../assets/dashboard.html');
 
-const TYPE_LABEL = { erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles' };
-const TYPE_ORDER = ['c4', 'erd', 'endpoints', 'lifecycle'];
+const TYPE_LABEL = { links: 'System', erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles' };
+const TYPE_ORDER = ['links', 'c4', 'erd', 'endpoints', 'lifecycle'];
 
 // Headline numbers per diagram type: [value, label] pairs, biggest first.
 function metrics(spec) {
@@ -22,13 +22,14 @@ function metrics(spec) {
     case 'erd': return [[spec.entities.length, 'entities'], [rels, 'relationships'], [(spec.groups || []).length, 'groups']];
     case 'c4': return [[spec.elements.length, 'elements'], [rels, 'relationships'], [(spec.boundaries || []).length, 'boundaries']];
     case 'lifecycle': return [[spec.states.length, 'states'], [(spec.transitions || []).length, 'transitions']];
+    case 'links': return [[spec.services.length, 'services'], [spec.links.length, 'calls']];
     case 'endpoints': return [[spec.endpoints.length, 'endpoints'], [(spec.groups || []).length, 'groups'], [(spec.types || []).length, 'types']];
     default: return [];
   }
 }
 
 function nodeCount(spec) { return metrics(spec)[0]?.[0] ?? 0; }
-function linkCount(spec) { return metrics(spec)[1]?.[1]?.match(/relationship|transition/) ? metrics(spec)[1][0] : 0; }
+function linkCount(spec) { return metrics(spec)[1]?.[1]?.match(/relationship|transition|call/) ? metrics(spec)[1][0] : 0; }
 
 function countsHtml(spec) {
   const shown = metrics(spec).filter(([value], i) => i === 0 || value > 0);
@@ -173,7 +174,7 @@ export function renderDashboard(items, { title = 'Architecture', subtitle, theme
       for (const w of result.warnings || []) warnings.push(`${e.file}: ${w}`);
       nav += `<a href="#d=${e.index}" data-panel="${e.index}" data-type="${type}"><span class="dot"></span><span class="t">${esc(e.spec.meta.title)}</span><span class="n">${nodeCount(e.spec)}</span></a>`;
       panels += panelHtml(e.index, e.spec, result);
-      e.embed = embeddable(e.spec, result);
+      e.embed = embeddable(e.spec, result, e.file);
     }
     nav += '</div>';
   }
