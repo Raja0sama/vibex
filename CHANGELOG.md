@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.7.0] - 2026-10-05
+
 ### Added
 - **`links` spec + `vibex links`.** Record how services call each other: one entry per call, anchored on the client and the handler. `--repo name=dir` checks across several repos; `--check` fails CI when either end moves. Lists endpoints nothing calls (`services[].ignore` hides health routes; `endpoint` takes a list for templated calls). Checks C4 diagrams against the calls (`services[].c4`): arrows with no call, calls with no arrow, neighbours left out. Example: `examples/shop.links.json`.
 - **System view.** A links spec renders as a diagram (and leads the dashboard): services as boxes, one arrow per service pair labelled with its call count. Click an arrow for every route behind it.
