@@ -32,8 +32,8 @@ Then it documents the system in claims that fail CI when the code moves undernea
 → **one command, run against the schema that actually ships.**
 
 ```bash
-cd ~ && npx skills add Raja0sama/vibex    # install the skill, then just ask
-npx @vibex/vibex demo out                # or look first — installs nothing
+npx skills add Raja0sama/vibex -g -a claude-code -a codex -y   # Claude Code + Codex, then just ask
+npx @vibex/vibex demo out                                      # or look first: installs nothing
 ```
 
 <div align="center">
@@ -93,8 +93,8 @@ TypeORM entities, Express routers, SQL migrations — and writes the spec itself
 
 ## Install it as a skill and stop learning flags
 
-vibeX is a Claude Code / Cursor skill first and a CLI second. Installed as a skill, the
-whole command surface collapses into a sentence — Claude reads `SKILL.md`, finds your
+vibeX is a Claude Code / Codex skill first and a CLI second. Installed as a skill, the
+whole command surface collapses into a sentence — the agent reads `SKILL.md`, finds your
 schema, picks the diagram type, writes the spec and renders it:
 
 ```
@@ -111,61 +111,67 @@ schema, picks the diagram type, writes the spec and renders it:
   wrote auth.docs.json · 41 claims, 38 verified
 ```
 
-**Install it.** One command, from your home directory:
+**Install it.** Pick your agent:
 
-```bash
-cd ~ && npx skills add Raja0sama/vibex
-```
+| Agent | Command |
+|---|---|
+| Claude Code + Codex | `npx skills add Raja0sama/vibex -g -a claude-code -a codex -y` |
+| Claude Code plugin | `/plugin marketplace add Raja0sama/vibex`, then `/plugin install vibex@vibex` |
+| Codex, by hand | `git clone https://github.com/Raja0sama/vibex ~/.agents/skills/vibex` |
 
-The directory matters, and it is the thing people get wrong: `skills add` installs
-relative to where you run it. From `~` the skill is available in every project. From a
-project directory it travels with that repository and nowhere else — which is what you
-want when the skill should be checked in alongside the code.
+Then:
+
+1. Restart the agent (or open a new session).
+2. Ask: *"show me the data model"*.
+
+`-g` installs for your user, so every project sees it. Codex reads `~/.agents/skills`;
+Claude Code gets a symlink in `~/.claude/skills`. The plugin route updates through
+`/plugin` instead.
 
 Check it landed:
 
 ```bash
-node ~/.claude/skills/vibex/bin/vibex.mjs types
+node ~/.agents/skills/vibex/bin/vibex.mjs types
 ```
 
-Then just ask. Claude picks the skill up from the folder name, and the CLI underneath is
-what the skill drives — it is there when you want it, not something you have to learn first.
-
 <details>
-<summary><b>Other ways in</b> — per-project, pinned to a release, or from source</summary>
+<summary><b>Other ways in</b>: per project, other agents, pinned to a release, or from source</summary>
 
 <br>
 
-**Per-project**, so the skill is checked in beside the code it documents:
+**Per project**, so the skill is checked in beside the code it documents. Drop `-g`
+and run it inside the repo:
 
 ```bash
-cd my-project && npx skills add Raja0sama/vibex
+cd my-project && npx skills add Raja0sama/vibex -a claude-code -a codex -y
 ```
 
-**Pinned to a published version**, if you would rather have a release than a clone of
-`main`. `SKILL.md` ships inside the npm package, so a global install plus one symlink
-does it:
+**Another agent** (Cursor, Gemini CLI, OpenCode, Copilot and more): swap the `-a`
+values, or run `npx skills add Raja0sama/vibex` and pick from the list.
+
+**Pinned to a published version.** `SKILL.md` ships inside the npm package, so a
+global install plus one symlink does it:
 
 ```bash
 npm i -g @vibex/vibex
-ln -s "$(npm root -g)/@vibex/vibex" ~/.claude/skills/vibex
+ln -s "$(npm root -g)/@vibex/vibex" ~/.claude/skills/vibex   # or ~/.agents/skills/vibex for Codex
 ```
 
-> Under nvm, `npm root -g` is scoped to the Node version you are on
-> (`~/.nvm/versions/node/v22.18.0/...`). Install a new Node and both the `vibex` binary
-> and this symlink stop resolving, silently. `skills add` has no such problem.
+> Under nvm, `npm root -g` is scoped to the Node version you are on. Install a new
+> Node and both the `vibex` binary and this symlink stop resolving, silently.
+> `skills add` has no such problem.
 
-**From source**, if you are changing vibeX itself — the symlink tracks your working copy,
-so edits apply the moment you save:
+**From source**, if you are changing vibeX itself. The symlink tracks your working
+copy, so edits apply the moment you save:
 
 ```bash
 git clone https://github.com/Raja0sama/vibex && cd vibex
 ln -s "$(pwd)" ~/.claude/skills/vibex
 ```
 
-`skills add` clones the repository rather than the npm package, and it has no
-`node_modules` — run `npm install` inside the skill folder if you need YAML OpenAPI.
-The npm paths above already have it.
+`skills add` and the plugin clone the repository, not the npm package, so they have
+no `node_modules`. Run `npm install` inside the skill folder only if you need YAML
+OpenAPI. The npm paths already have it.
 
 </details>
 
@@ -370,7 +376,12 @@ A new diagram type is a schema, a validator function, a renderer that emits
 ## Install
 
 ```bash
-cd ~ && npx skills add Raja0sama/vibex   # the skill, in every project
+npx skills add Raja0sama/vibex -g -a claude-code -a codex -y   # Claude Code + Codex
+```
+
+```
+/plugin marketplace add Raja0sama/vibex     # or, inside Claude Code
+/plugin install vibex@vibex
 ```
 
 The CLI comes with it and is what the skill drives. If you want it on your `PATH` as

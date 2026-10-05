@@ -1,0 +1,13 @@
+{
+  "name": "vibex",
+  "owner": { "name": "Raja Osama", "url": "https://github.com/Raja0sama" },
+  "description": "vibeX: architecture diagrams and checkable docs from your codebase",
+  "plugins": [
+    {
+      "name": "vibex",
+      "source": "./",
+      "description": "ERD, C4, API endpoint, lifecycle and service-links diagrams from your code, plus documentation that fails CI when the code moves.",
+      "category": "documentation"
+    }
+  ]
+}
