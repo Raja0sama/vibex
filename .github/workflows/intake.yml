@@ -34,7 +34,7 @@ jobs:
 
       - name: say what happens next
         if: steps.decide.outputs.reply != ''
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           REPLY: ${{ steps.decide.outputs.reply }}
         with:
@@ -47,7 +47,7 @@ jobs:
             });
 
       - name: label what it needs
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const action = '${{ steps.decide.outputs.action }}';
@@ -84,7 +84,7 @@ jobs:
 
       - name: explain that nothing will be written
         if: steps.key.outputs.present != 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             await github.rest.issues.createComment({
