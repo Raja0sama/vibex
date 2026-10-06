@@ -201,8 +201,13 @@ test('hostile spec: dashboard applies the same single-pass slot filling', () => 
   assert.ok(specs.some((s) => s.meta.title.includes('<!-- VIBEX:LEGEND -->')));
 });
 
-// A linked page's data file, evaluated the way the browser would.
-const linkedData = (js) => { const window = {}; new Function('window', js)(window); return window.VIBEX_DATA; };
+// A linked page's data file is one assignment of a JSON literal, and nothing
+// else: parse it as data rather than running it.
+const linkedData = (js) => {
+  const m = /^window\.VIBEX_DATA = ([\s\S]*);\n$/.exec(js);
+  assert.ok(m, 'data file is a single window.VIBEX_DATA assignment');
+  return JSON.parse(m[1]);
+};
 
 test('linked: the page is a placeholder and the data lives in sibling files', () => {
   const spec = json('examples/orders.erd.json');

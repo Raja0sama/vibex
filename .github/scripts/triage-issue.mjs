@@ -11,6 +11,8 @@ import { validateSpec, DIAGRAM_TYPES } from '../../renderers/shared/validate.mjs
 const dir = process.argv[2] || 'examples';
 const body = process.env.ISSUE_BODY || '';
 const labels = (process.env.ISSUE_LABELS || '').split(',').map((l) => l.trim()).filter(Boolean);
+// Mirrors the author job's gate in intake.yml: only people with write access reach the agent.
+const trusted = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(process.env.ISSUE_AUTHOR_ASSOCIATION || '');
 
 // Build the current picture so every reference in the issue is checked against
 // what exists now, not what existed when the page was rendered.
@@ -32,9 +34,11 @@ const result = triage(parsed, { graph, specIds: new Set(specs.keys()), specs, la
 
 const reply = result.action === ACTIONS.ask
   ? result.reply
-  : result.action === ACTIONS.act
+  : result.action === ACTIONS.act && trusted
     ? `Picking this up.\n\n**What I will do:** ${PLAYBOOK[parsed.intent]}\n\nI will open a pull request. A person reviews it before anything merges — nothing here changes the docs on its own.`
-    : '';
+    : result.action === ACTIONS.act
+      ? `This has everything needed to act on, and it is labelled \`ready\`. Issues from outside the project are not handed to the agent automatically, so a maintainer will pick it up.\n\n**What will be done:** ${PLAYBOOK[parsed.intent]}`
+      : '';
 
 const out = {
   action: result.action,

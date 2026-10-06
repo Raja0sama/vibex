@@ -4,7 +4,11 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+- **npm provenance.** Each release records which repository, workflow and commit built it, shown on the npm page.
+- **Intake agent only acts for maintainers.** Issue text is public input; issues from outside the project are triaged and answered, but a maintainer picks them up.
+- **`--open` on Windows** uses `explorer.exe` instead of `cmd /c start`, which could run a command hidden in a file name.
+- **Workflow actions pinned to commits**, kept current by Dependabot.
 
 ## [0.7.1] - 2026-10-05
 

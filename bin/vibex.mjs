@@ -121,9 +121,9 @@ function fail(message, exitCode = 2) {
 }
 
 function openFile(file) {
-  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', file] : [file];
-  spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+  // Never `cmd /c start`: cmd re-parses the path, so a name with `&` in it runs a command.
+  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer.exe' : 'xdg-open';
+  spawn(cmd, [file], { stdio: 'ignore', detached: true }).unref();
 }
 
 // Collect diagram specs from files and directories, keyed by their spec id
