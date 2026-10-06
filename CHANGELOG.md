@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.7.2] - 2026-10-06
+
 ### Security
 - **npm provenance.** Each release records which repository, workflow and commit built it, shown on the npm page.
 - **Intake agent only acts for maintainers.** Issue text is public input; issues from outside the project are triaged and answered, but a maintainer picks them up.

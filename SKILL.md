@@ -3,7 +3,7 @@ name: vibex
 description: 'Diagrams and checkable docs from a codebase. Draws ERDs, C4 context/container/component views, API endpoint catalogues, lifecycle/state machines, and service-to-service call maps as a validated JSON spec plus a standalone HTML viewer, with Mermaid export. Imports OpenAPI, GraphQL SDL and Prisma; otherwise reads the code (NestJS, TypeORM, Express) and writes the spec. Use for: database diagram, ERD, data model, table relationships, C4 or architecture diagram, system context, API map, endpoint list, "show me the endpoints", status flow, state machine, allowed transitions, "what happens after X is approved", how services call each other, microservice map, Mermaid diagram. Also writes documentation as a fact graph: each statement carries its source and a computed confidence, and a drift check fails CI when the code moves. Use to document a system, write architecture or onboarding docs, or explain how a system works.'
 license: MIT
 metadata:
-  version: "0.7.1"
+  version: "0.7.2"
   cli: node bin/vibex.mjs
   repository: https://github.com/Raja0sama/vibex
 ---

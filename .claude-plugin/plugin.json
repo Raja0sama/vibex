@@ -1,7 +1,7 @@
 {
   "name": "vibex",
   "displayName": "vibeX",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "ERD, C4, API endpoint, lifecycle and service-links diagrams from your code, as a JSON spec plus a standalone HTML viewer, and documentation whose claims fail CI when the code moves.",
   "author": {
     "name": "Raja Osama",
