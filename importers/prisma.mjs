@@ -92,11 +92,15 @@ export function importPrisma(src, { title, sourcePath } = {}) {
         fields.forEach((f, k) => { const c = columns.find((x) => x.name === f); if (c) c.fk = `${targetId}.${references[k] || references[0]}`; });
         const fkCol = columns.find((x) => x.name === fields[0]);
         const onDelete = /onDelete\s*:\s*(\w+)/.exec(rel.args);
+        // One row per target when the FK is unique, or is the table's only primary key.
+        const singleRow = fkCol?.unique || (fkCol?.pk && columns.filter((c) => c.pk).length === 1);
+        let fromCardinality = 'many';
+        if (singleRow) fromCardinality = fkCol?.nullable ? 'zero-or-one' : 'one';
         relationships.push({
           id: uniqueId(slug(`${entityId}-${rf.name}`).toLowerCase(), relIds),
           from: entityId,
           to: targetId,
-          from_cardinality: fkCol?.unique || fkCol?.pk && columns.filter((c) => c.pk).length === 1 ? (fkCol?.nullable ? 'zero-or-one' : 'one') : 'many',
+          from_cardinality: fromCardinality,
           to_cardinality: rf.optional ? 'zero-or-one' : 'one',
           from_column: fields.join(', '),
           to_column: references.join(', '),

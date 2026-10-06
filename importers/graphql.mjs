@@ -162,6 +162,24 @@ export function baseType(type) { return String(type || '').replace(/[![\]]/g, ''
 const isList = (type) => String(type || '').includes('[');
 const isRequired = (type) => String(type || '').endsWith('!');
 
+function typeBody(d) {
+  if (d.kind === 'enum') return { values: d.values };
+  if (d.kind === 'union') return { fields: d.members.map((m) => ({ name: m, type: m })) };
+  const fields = (d.fields || []).map((f) => ({
+    name: f.name,
+    type: f.type.replace(/!$/, ''),
+    ...(isRequired(f.type) ? { required: true } : {}),
+    ...(f.description ? { description: firstSentence(f.description, 100) } : {}),
+  }));
+  return { fields };
+}
+
+// The list side is many; a single reference is one, or zero-or-one when nullable.
+function parentCardinality(parent) {
+  if (!parent || parent.list) return 'many';
+  return parent.required ? 'one' : 'zero-or-one';
+}
+
 export function importGraphql(src, { title, erd = false, sourcePath } = {}) {
   const { defs, roots } = parseSdl(src);
   return erd ? graphqlToErd(defs, roots, { title, sourcePath }) : graphqlToEndpoints(defs, roots, { title, sourcePath });
@@ -213,7 +231,7 @@ function graphqlToEndpoints(defs, roots, { title, sourcePath }) {
       name: d.name,
       kind: d.kind,
       ...(d.description ? { description: firstSentence(d.description, 160) } : {}),
-      ...(d.kind === 'enum' ? { values: d.values } : d.kind === 'union' ? { fields: d.members.map((m) => ({ name: m, type: m })) } : { fields: (d.fields || []).map((f) => ({ name: f.name, type: f.type.replace(/!$/, ''), ...(isRequired(f.type) ? { required: true } : {}), ...(f.description ? { description: firstSentence(f.description, 100) } : {}) })) }),
+      ...typeBody(d),
     }));
   return {
     schema_version: 1,
@@ -267,13 +285,14 @@ function graphqlToErd(defs, roots, { title, sourcePath }) {
     let child = e; let parent = back;
     if (e.list && back && !back.list) { child = back; parent = e; }
     if (e.list && !back) { child = { from: e.to, to: e.from, field: undefined, list: false, required: true }; parent = e; }
+    const label = child.field || parent?.field;
     relationships.push({
-      id: slug(`${child.from}-${child.to}-${child.field || parent?.field || 'ref'}`).toLowerCase(),
+      id: slug(`${child.from}-${child.to}-${label || 'ref'}`).toLowerCase(),
       from: idOf(child.from),
       to: idOf(child.to),
-      from_cardinality: parent ? (parent.list ? 'many' : (parent.required ? 'one' : 'zero-or-one')) : 'many',
+      from_cardinality: parentCardinality(parent),
       to_cardinality: child.required ? 'one' : 'zero-or-one',
-      ...(child.field ? { label: child.field } : parent?.field ? { label: parent.field } : {}),
+      ...(label ? { label } : {}),
     });
   });
   return {

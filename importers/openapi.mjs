@@ -79,6 +79,12 @@ function authOf(op, doc) {
   return names.join(' | ') || 'none';
 }
 
+function baseUrlOf(doc, isV2) {
+  if (!isV2) return doc.servers?.[0]?.url;
+  if (!doc.host) return undefined;
+  return `${(doc.schemes || ['https'])[0]}://${doc.host}${doc.basePath || ''}`;
+}
+
 export function importOpenApi(doc, { title, allTypes = false, sourcePath } = {}) {
   const isV2 = Boolean(doc.swagger);
   const schemas = isV2 ? (doc.definitions || {}) : (doc.components?.schemas || {});
@@ -162,9 +168,7 @@ export function importOpenApi(doc, { title, allTypes = false, sourcePath } = {})
     });
 
   const info = doc.info || {};
-  const baseUrl = isV2
-    ? (doc.host ? `${(doc.schemes || ['https'])[0]}://${doc.host}${doc.basePath || ''}` : undefined)
-    : doc.servers?.[0]?.url;
+  const baseUrl = baseUrlOf(doc, isV2);
   return {
     schema_version: 1,
     diagram_type: 'endpoints',
