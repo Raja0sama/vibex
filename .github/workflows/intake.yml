@@ -20,8 +20,8 @@ jobs:
       intent: ${{ steps.decide.outputs.intent }}
       playbook: ${{ steps.decide.outputs.playbook }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
@@ -29,11 +29,12 @@ jobs:
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+          ISSUE_AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
         run: node .github/scripts/triage-issue.mjs examples
 
       - name: say what happens next
         if: steps.decide.outputs.reply != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           REPLY: ${{ steps.decide.outputs.reply }}
         with:
@@ -46,7 +47,7 @@ jobs:
             });
 
       - name: label what it needs
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const action = '${{ steps.decide.outputs.action }}';
@@ -62,23 +63,28 @@ jobs:
   # The authoring step. It runs only once triage says the request is actionable,
   # and only if an API key is configured — without one the queue still triages
   # and answers, it just does not write anything.
+  # Issue text is public input: anyone can open one, and the templates label it
+  # intake. Only issues from people with write access reach the agent; the rest
+  # are still triaged and answered, and a maintainer picks them up by hand.
   author:
     needs: triage
-    if: needs.triage.outputs.action == 'act'
+    if: >-
+      needs.triage.outputs.action == 'act' &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: check for a key
         id: key
         run: echo "present=${{ secrets.ANTHROPIC_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
 
       - name: explain that nothing will be written
         if: steps.key.outputs.present != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             await github.rest.issues.createComment({
@@ -91,7 +97,7 @@ jobs:
       # drift check to pass — and it opens a pull request, never a merge.
       - name: write it
         if: steps.key.outputs.present == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
