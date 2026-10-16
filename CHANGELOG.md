@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ### Added
 - **Sequence diagrams.** A new `sequence` type draws one flow end to end: participants, numbered messages (sync, async, reply), activation bars, notes, and `alt`/`opt`/`loop`/`par`/`break` fragments. Exports to Mermaid `sequenceDiagram`, shows in the dashboard as Flows, and the `sequence.messages` docs generator writes one sentence per step. Example: `examples/checkout.sequence.json`.
+- **`vibex workspace`: one site for several repos.** Run it from the folder above them. It finds each repo's specs and builds a landing page plus one dashboard per repo. Specs can live inside each repo or in a shared folder.
+- **`vibex host`: serve the docs behind a login.** Writes a Dockerfile, `docker-compose.yml` and nginx config next to any folder of pages. The login is on by default; the container will not start without `VIBEX_USER` and `VIBEX_PASSWORD` unless `VIBEX_PUBLIC=1`. `/healthz` stays open for platform health checks.
 
 ### Changed
 - **Busy lifecycle diagrams are easier to read.** States in a column are ordered to cut crossings, and transitions that go back a step loop over or under the boxes instead of piling onto one side.

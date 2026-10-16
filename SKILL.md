@@ -69,6 +69,15 @@ Skill root: the directory containing this file. Every command below is `node <sk
 
    The overview page lists every diagram, shows which endpoints touch which tables (from `endpoints[].entities`), and resolves C4 `link` values that name another spec file in the folder (`link: "bff.c4.html"` → the `bff.c4.json` panel; both specs must be in the same `dashboard` invocation, matching is by file name). Re-run it after every spec change; it is cheap.
 
+   **Several repos side by side?** Run from the folder above them. Keep each repo's specs inside that repo (e.g. `repo-a/docs/arch/`) so its CI can check drift; a shared folder of cross-repo specs works too, with anchor paths prefixed by the repo folder (`repo-a/src/x.ts`). Then:
+
+   ```bash
+   node bin/vibex.mjs workspace ~/work --title "My platform"          # → ~/work/vibex-site/
+   node bin/vibex.mjs workspace ~/work --host                          # + Dockerfile, nginx, login
+   ```
+
+   One dashboard per top-level folder that holds specs, plus a landing page listing them. Re-run after any spec change; folders whose specs are gone are removed from the site.
+
 6. **Report**: the two paths, counts (entities/elements/endpoints and relationships), what was imported vs inferred, and anything you left out on purpose. If code reading left ambiguity (cardinality, auth), say so in one line and put it in a `cards` note with `tone: "warning"`.
 
 ## Documentation (`docs`)
@@ -327,6 +336,11 @@ links <links.json> [spec dirs...] --repo [name=]dir... [--check] [--reanchor] [-
 demo [dir] [--linked]  render examples/ into dir (+ dashboard.html)
 --linked          write the HTML as a placeholder page: data in <name>.data.js, viewer in
                   vibex-viewer.js/.css beside it. Opens from disk; keep the files together.
+workspace [dir] [-o site] [--title T] [--host] [--linked] [--force]
+                  folder above several repos → one site: landing page + a dashboard per repo
+host [dir] [--force]
+                  write Dockerfile, docker-compose.yml and nginx config to serve a folder of pages
+                  behind a login (VIBEX_USER / VIBEX_PASSWORD; VIBEX_PUBLIC=1 to turn it off)
 outdated [dir]    which generated files this version would now render differently.
                   Exits 1 if any is stale, so CI can gate on it.
 types             list types with schema and example paths

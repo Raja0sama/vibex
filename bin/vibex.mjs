@@ -16,6 +16,8 @@ import { buildFingerprint, readStamp, packageVersion } from '../renderers/shared
 import { checkLinks, reanchorLinks } from '../renderers/links/check.mjs';
 import { parseLayout, checkLayoutAgainst, applyLayout, spliceLayout } from '../renderers/shared/positions.mjs';
 import { toMermaid } from '../renderers/mermaid/to-mermaid.mjs';
+import { findWorkspace, renderWorkspaceIndex, slugOf, SITE_MARKER } from '../renderers/shared/workspace.mjs';
+import { hostFiles, isOurs } from '../renderers/shared/host.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,6 +38,13 @@ Usage:
                                   A *.docs.json in the set becomes a Documentation panel and a
                                   changelog.json beside them becomes a Changes panel;
                                   --repo lets anchored claims be checked.
+  vibex workspace [dir] [-o site] [--title "..."] [--host] [--linked] [--force] [--open] [--json]
+                                  run from the folder above several repos: finds every repo's specs
+                                  and builds one site, a landing page plus a dashboard per repo
+                                  (default <dir>/vibex-site). --host also writes the files below.
+  vibex host [dir] [--force] [--json]
+                                  serve a folder of generated pages (a dashboard or a workspace site)
+                                  with nginx in Docker, behind a login: VIBEX_USER / VIBEX_PASSWORD.
   vibex docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo <dir>]
                  [--check] [--reanchor] [--lock docs.lock.json] [--no-lock] [--json]
                                   build the fact graph: derived facts + authored claims,
@@ -589,6 +598,27 @@ function collectSpecFiles(inputs) {
   return files;
 }
 
+// Spec files as dashboard items. A file that does not parse is reported, not fatal.
+function readSpecItems(files) {
+  const unreadable = [];
+  const items = [];
+  for (const file of files) {
+    const name = path.basename(file).replace(/\.json$/i, '');
+    let spec;
+    try { spec = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { unreadable.push({ file: name, message: e.message }); continue; }
+    if (spec && typeof spec === 'object' && spec.diagram_type) items.push({ file: name, spec });
+  }
+  return { items, unreadable };
+}
+
+function loadChangelog(file) {
+  if (!file || !fs.existsSync(file)) return null;
+  const loaded = readJson(file);
+  if (loaded?.artifact === 'changelog') return loaded;
+  console.error(`warning ${file} is not a changelog artefact; ignoring it`);
+  return null;
+}
+
 async function cmdDashboard(args) {
   const title = valueFlag(args, '--title');
   const subtitle = valueFlag(args, '--subtitle');
@@ -601,14 +631,7 @@ async function cmdDashboard(args) {
   const [outArg, ...inputs] = args;
   if (!outArg || !inputs.length) fail(HELP);
   const { renderDashboard } = await import('../renderers/shared/dashboard.mjs');
-  const unreadable = [];
-  const items = [];
-  for (const file of collectSpecFiles(inputs)) {
-    const name = path.basename(file).replace(/\.json$/i, '');
-    let spec;
-    try { spec = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { unreadable.push({ file: name, message: e.message }); continue; }
-    if (spec && typeof spec === 'object' && spec.diagram_type) items.push({ file: name, spec });
-  }
+  const { items, unreadable } = readSpecItems(collectSpecFiles(inputs));
   for (const u of unreadable) console.error(`skipped ${u.file}: ${u.message}`);
   if (!items.length) fail('No diagram specs found (need JSON files with a diagram_type).');
   const docsCount = items.filter((i) => i.spec.diagram_type === 'docs').length;
@@ -620,14 +643,8 @@ async function cmdDashboard(args) {
   const commit = docsCount ? head(gitRunner(path.resolve(repoArg || process.cwd()))) : null;
   // A changelog.json sitting beside the specs is picked up without being asked
   // for; an explicit --changelog wins.
-  let changelog = null;
-  const clPath = changelogArg
-    || collectSpecFiles(inputs).find((f) => path.basename(f) === 'changelog.json');
-  if (clPath && fs.existsSync(clPath)) {
-    const loaded = readJson(clPath);
-    if (loaded?.artifact === 'changelog') changelog = loaded;
-    else console.error(`warning ${clPath} is not a changelog artefact; ignoring it`);
-  }
+  const changelog = loadChangelog(changelogArg
+    || collectSpecFiles(inputs).find((f) => path.basename(f) === 'changelog.json'));
   const out = path.resolve(outArg);
   const { html, files, entries, problems, warnings } = renderDashboard(items, { title: title || 'Architecture', subtitle, anchorStatus, commit, changelog, linked, name: pageName(out) });
   for (const p of problems) console.error(`skipped ${p.file}: ${p.errors.map((e) => e.message).join('; ')}`);
@@ -638,6 +655,134 @@ async function cmdDashboard(args) {
   else console.log(out);
   if (open) openFile(out);
   if (problems.length || unreadable.length) process.exit(1);
+}
+
+// Hosting files are only replaced when vibeX wrote them, so a Dockerfile
+// someone has tuned by hand survives a re-run.
+function writeHostFiles(dir, { force = false } = {}) {
+  const written = [];
+  const kept = [];
+  for (const [rel, content] of Object.entries(hostFiles())) {
+    const file = path.join(dir, rel);
+    if (!force && fs.existsSync(file) && !isOurs(fs.readFileSync(file, 'utf8'))) { kept.push(rel); continue; }
+    writeOut(file, content);
+    written.push(rel);
+  }
+  return { written, kept };
+}
+
+function hostHint(dir) {
+  const near = path.relative(process.cwd(), dir) || '.';
+  const rel = near.startsWith('..') ? dir : near;
+  return [
+    '',
+    'Serve it:',
+    `  cd ${rel}`,
+    '  VIBEX_USER=you VIBEX_PASSWORD=change-me docker compose up --build',
+    '  open http://localhost:8080',
+    'The container refuses to start without VIBEX_USER and VIBEX_PASSWORD; VIBEX_PUBLIC=1 serves without a login.',
+  ].join('\n');
+}
+
+function cmdHost(args) {
+  const force = boolFlag(args, '--force');
+  const json = boolFlag(args, '--json');
+  rejectUnknownFlags(args);
+  const dir = path.resolve(args[0] || 'out');
+  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) fail(`No such directory: ${args[0] || 'out'}`);
+  const pages = fs.readdirSync(dir).filter((f) => f.endsWith('.html'));
+  if (!pages.length) fail(`No .html files in ${dir}. Render diagrams or build a dashboard there first.`);
+  const { written, kept } = writeHostFiles(dir, { force });
+  for (const k of kept) console.error(`kept ${k}: not written by vibeX; pass --force to replace it`);
+  const landing = ['index.html', 'dashboard.html'].find((f) => pages.includes(f));
+  if (json) console.log(JSON.stringify({ ok: !kept.length, dir, written, kept, landing: landing || null }, null, 2));
+  else {
+    for (const w of written) console.log(path.join(dir, w));
+    if (!landing) console.error(`warning no index.html or dashboard.html in ${dir}; "/" will 404, link to a page by name`);
+    console.log(hostHint(dir));
+  }
+  if (kept.length) process.exit(1);
+}
+
+async function cmdWorkspace(args) {
+  const outArg = valueFlag(args, '-o') || valueFlag(args, '--out');
+  const title = valueFlag(args, '--title');
+  const subtitle = valueFlag(args, '--subtitle');
+  const linked = boolFlag(args, '--linked');
+  const host = boolFlag(args, '--host');
+  const force = boolFlag(args, '--force');
+  const open = boolFlag(args, '--open');
+  const json = boolFlag(args, '--json');
+  rejectUnknownFlags(args);
+  const rootDir = path.resolve(args[0] || '.');
+  if (!fs.statSync(rootDir, { throwIfNoEntry: false })?.isDirectory()) fail(`No such directory: ${args[0] || '.'}`);
+  const out = path.resolve(outArg || path.join(rootDir, 'vibex-site'));
+  const markerFile = path.join(out, SITE_MARKER);
+  // Only ever clean up a folder this command built.
+  let previous = [];
+  if (fs.existsSync(markerFile)) previous = readJson(markerFile).groups || [];
+  else if (fs.existsSync(out) && fs.readdirSync(out).length && !force) fail(`${out} exists and was not built by "vibex workspace". Pick another -o, or pass --force.`);
+
+  const { renderDashboard } = await import('../renderers/shared/dashboard.mjs');
+  const { groups } = findWorkspace(rootDir, { exclude: [out] });
+  if (!groups.length) fail(`No vibeX specs under ${rootDir}. Each repo needs its *.erd.json, *.c4.json, ... files somewhere inside it.`);
+
+  const cards = [];
+  const report = [];
+  let failed = false;
+  for (const g of groups) {
+    const specFiles = g.files.filter((f) => path.basename(f) !== 'changelog.json');
+    const { items, unreadable } = readSpecItems(specFiles);
+    for (const u of unreadable) console.error(`skipped ${g.name}/${u.file}: ${u.message}`);
+    // A repo checks anchors against itself; specs outside any repo anchor
+    // against the workspace, as "repo-a/src/...".
+    const repo = g.isRepo ? g.dir : rootDir;
+    const hasDocs = items.some((i) => i.spec.diagram_type === 'docs');
+    const changelog = loadChangelog(g.files.find((f) => path.basename(f) === 'changelog.json'));
+    const rel = path.relative(rootDir, g.dir) || '.';
+    const dash = renderDashboard(items, {
+      title: g.name,
+      subtitle: subtitle ? `${subtitle} · ${rel}` : rel,
+      anchorStatus: hasDocs ? ((spec) => anchorStatusFor(spec, repo)) : null,
+      commit: hasDocs ? head(gitRunner(repo)) : null,
+      changelog,
+      linked,
+      name: 'index',
+    });
+    for (const p of dash.problems) console.error(`skipped ${g.name}/${p.file}: ${p.errors.map((e) => e.message).join('; ')}`);
+    for (const w of dash.warnings) console.error(`warning ${g.name}: ${w}`);
+    const page = path.join(out, g.slug, 'index.html');
+    writePage(page, dash.html, dash.files);
+    const counts = {};
+    for (const e of dash.entries) counts[e.spec.diagram_type] = (counts[e.spec.diagram_type] || 0) + 1;
+    for (const i of items) if (i.spec.diagram_type === 'docs') counts.docs = (counts.docs || 0) + 1;
+    const skipped = unreadable.length + dash.problems.length;
+    if (skipped) failed = true;
+    const where = [...new Set(specFiles.map((f) => path.relative(g.dir, path.dirname(f)) || '.'))].join(', ');
+    cards.push({ name: g.name, slug: g.slug, rel: where, counts, skipped });
+    report.push({ name: g.name, dir: rel, page, diagrams: dash.entries.length, skipped });
+  }
+  const current = new Set(groups.map((g) => g.slug));
+  for (const slug of previous) {
+    if (typeof slug === 'string' && slug === slugOf(slug) && !current.has(slug)) fs.rmSync(path.join(out, slug), { recursive: true, force: true });
+  }
+  const index = path.join(out, 'index.html');
+  writeOut(index, renderWorkspaceIndex(cards, { title: title || path.basename(rootDir), subtitle }));
+  writeOut(markerFile, `${JSON.stringify({ generator: `vibex ${packageVersion(root)}`, groups: [...current] }, null, 2)}\n`);
+  let hosting = null;
+  if (host) {
+    hosting = writeHostFiles(out, { force });
+    for (const k of hosting.kept) console.error(`kept ${k}: not written by vibeX; pass --force to replace it`);
+    if (hosting.kept.length) failed = true;
+  }
+  if (json) console.log(JSON.stringify({ ok: !failed, output: index, repos: report, hosting }, null, 2));
+  else {
+    console.log(index);
+    for (const r of report) console.log(`  ${r.name.padEnd(24)} ${r.diagrams} diagram${r.diagrams === 1 ? '' : 's'}${r.skipped ? `, ${r.skipped} skipped` : ''}`);
+    if (host) console.log(hostHint(out));
+  }
+  if (open) openFile(index);
+  if (failed) process.exit(1);
 }
 
 async function cmdDemo(args) {
@@ -769,6 +914,8 @@ switch (command) {
   case 'layout': cmdLayout(rest); break;
   case 'mermaid': cmdMermaid(rest); break;
   case 'changelog': cmdChangelog(rest); break;
+  case 'workspace': await cmdWorkspace(rest); break;
+  case 'host': cmdHost(rest); break;
   case 'demo': await cmdDemo(rest); break;
   case 'outdated': cmdOutdated(rest); break;
   case 'types': cmdTypes(); break;
