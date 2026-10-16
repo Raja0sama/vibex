@@ -140,3 +140,33 @@ test('layout: writing positions touches only the layout block, and clearing rest
   applyLayout(spec, {}, { replace: true });
   assert.deepEqual(JSON.parse(spliceLayout(first, spec)), { a: 1 }, 'removing a first-key layout leaves valid JSON');
 });
+
+const edgeEnd = (svg, from, to) => {
+  const m = new RegExp(`data-edge-from="${from}" data-edge-to="${to}"[\\s\\S]*?<path class="line" d="([^"]+)"`).exec(svg);
+  const n = m[1].trim().split(/[\sA-Z]+/).filter(Boolean).map(Number);
+  return n.slice(-2);
+};
+
+test('lifecycle: ordering within a column never adds crossings', async () => {
+  const { orderRanks } = await import('../renderers/shared/layout.mjs');
+  const row = (...ids) => ids.map((id) => ({ id }));
+  // a→y and b→x cross as given; swapping one column untangles them.
+  const out = orderRanks([row('a', 'b'), row('x', 'y')], [['a', 'y'], ['b', 'x']]);
+  assert.ok(['ab|yx', 'ba|xy'].includes(out.map((r) => r.map((i) => i.id).join('')).join('|')));
+  const pinned = orderRanks([row('a', 'b'), row('x', 'y')], [['a', 'y'], ['b', 'x']], { fixed: () => true });
+  assert.equal(pinned.map((r) => r.map((i) => i.id).join('')).join('|'), 'ab|xy');
+});
+
+test('lifecycle: a backward transition enters over or under its target, not beside it', () => {
+  const spec = json('test/fixtures/claim.lifecycle.json');
+  const { svg } = renderSpec(spec);
+  const [x, y] = atOf(svg, 'under_review');
+  const [, ey] = edgeEnd(svg, 'escalated', 'under_review');
+  const h = Number(/data-node-id="under_review"[\s\S]*?<rect class="box"[^>]*height="([\d.]+)"/.exec(svg)[1]);
+  assert.ok(Math.abs(ey - y) < 1 || Math.abs(ey - (y + h)) < 1, `send back ends at y=${ey}, box ${y}..${y + h} (x ${x})`);
+  const [, py] = edgeEnd(svg, 'payment_failed', 'payment_pending');
+  const [, ppy] = atOf(svg, 'payment_pending');
+  const ph = Number(/data-node-id="payment_pending"[\s\S]*?<rect class="box"[^>]*height="([\d.]+)"/.exec(svg)[1]);
+  assert.ok(Math.abs(py - ppy) < 1 || Math.abs(py - (ppy + ph)) < 1, `retry transfer ends at y=${py}, box ${ppy}..${ppy + ph}`);
+  assert.deepEqual(validateSpec(spec).errors, []);
+});

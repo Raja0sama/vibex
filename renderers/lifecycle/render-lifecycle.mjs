@@ -1,5 +1,5 @@
 import { esc, svgText, nodeAttrs, edgeAttrs, truncate, textWidth, wrapText, fitChars, num, cellIndex } from '../shared/utils.mjs';
-import { rowsPlace, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets, detour, pinPositions } from '../shared/layout.mjs';
+import { rowsPlace, orderRanks, bbox, routeOrthogonal, routeSelfLoop, pathFromPoints, placeLabel, portOffsets, channelOffsets, detour, routeHits, pinPositions } from '../shared/layout.mjs';
 import { wrapSvg } from '../shared/svgdoc.mjs';
 
 const MARGIN = 40;
@@ -54,13 +54,15 @@ function autoRanks(spec) {
   const rows = [];
   for (const s of spec.states) (rows[rank.get(s.id)] ||= []).push(s);
   const KIND_ORDER = { initial: 0, normal: 1, waiting: 2, undefined: 1, failure: 3, terminal: 4 };
-  return rows.filter(Boolean).map((row) => row.sort((a, b) => {
+  const sorted = rows.filter(Boolean).map((row) => row.sort((a, b) => {
     const ca = cellIndex(a.col); const cb = cellIndex(b.col);
     if (ca !== undefined && cb !== undefined) return ca - cb;
     if (ca !== undefined) return -1;
     if (cb !== undefined) return 1;
     return (KIND_ORDER[a.kind] ?? 1) - (KIND_ORDER[b.kind] ?? 1);
   }));
+  const edges = (spec.transitions || []).map((t) => [t.from, t.to]);
+  return orderRanks(sorted, edges, { fixed: (row) => row.some((s) => cellIndex(s.col) !== undefined) });
 }
 
 function renderState(state, rect, direction) {
@@ -121,11 +123,92 @@ function gapsFor(transitions) {
   return { w, h };
 }
 
-function renderTransition(t, index, rects, offset, obstacles) {
+const flip = (r) => ({ ...r, x: r.y, y: r.x, w: r.h, h: r.w });
+const BACK_GAP = 22;
+const BACK_LANE = 14;
+
+function isBack(a, b, direction) {
+  return direction === 'tb' ? b.y + b.h + 24 <= a.y : b.x + b.w + 24 <= a.x;
+}
+
+// A transition that runs against the flow (retry, send back, appeal upheld)
+// drawn like a forward one lands on the same side forward edges leave from,
+// and every box with a loop becomes a knot. Back edges go over or under
+// instead, each in its own lane. Worked in lr; tb is the same with x/y swapped.
+function loopPoints(a, b, side, y, ao = 0, bo = 0) {
+  const ax = a.x + a.w / 2 + ao; const bx = b.x + b.w / 2 + bo;
+  const ay = side === 'top' ? a.y : a.y + a.h; const by = side === 'top' ? b.y : b.y + b.h;
+  return [[ax, ay], [ax, y], [bx, y], [bx, by]];
+}
+
+function backRoutes(transitions, rects, direction, avoid = []) {
+  const T = direction === 'tb' ? flip : (r) => r;
+  const boxes = [...rects.entries()].map(([id, r]) => ({ id, ...T(r) }));
+  const mid = boxes.reduce((s, r) => s + r.y + r.h / 2, 0) / Math.max(1, boxes.length);
+  const back = [];
+  transitions.forEach((t, i) => {
+    const a = rects.get(t.from); const b = rects.get(t.to);
+    if (!a || !b || t.from === t.to || !isBack(a, b, direction)) return;
+    const e = { i, a: T(a), b: T(b) };
+    const others = boxes.filter((r) => r.id !== t.from && r.id !== t.to);
+    const hits = (side) => routeHits(loopPoints(e.a, e.b, side, side === 'top' ? Math.min(e.a.y, e.b.y) - BACK_GAP : Math.max(e.a.y + e.a.h, e.b.y + e.b.h) + BACK_GAP), others).length;
+    const preferred = (e.a.y + e.a.h / 2 + e.b.y + e.b.h / 2) / 2 <= mid ? 'top' : 'bottom';
+    const other = preferred === 'top' ? 'bottom' : 'top';
+    // A leg that climbs through a box in its own column is worse than the knot
+    // this avoids, so such a transition keeps the ordinary route.
+    e.side = !hits(preferred) ? preferred : !hits(other) ? other : null;
+    if (e.side) back.push(e);
+  });
+  // Short loops take the inner lanes so long ones wrap around them, not through.
+  back.sort((p, q) => (p.a.x - p.b.x) - (q.a.x - q.b.x) || p.i - q.i);
+  // Forward routes are already drawn, so a lane that lands on one of their
+  // horizontal runs reads as the same line.
+  const used = [];
+  for (const pts of avoid) {
+    const tp = direction === 'tb' ? pts.map(([x, y]) => [y, x]) : pts;
+    for (let k = 1; k < tp.length; k += 1) {
+      const [p, q] = [tp[k - 1], tp[k]];
+      if (p[1] === q[1]) used.push({ lo: Math.min(p[0], q[0]), hi: Math.max(p[0], q[0]), y: p[1] });
+    }
+  }
+  const ends = new Map();
+  for (const e of back) {
+    for (const [id, end, other] of [[transitions[e.i].from, 'ao', e.b], [transitions[e.i].to, 'bo', e.a]]) {
+      const k = `${id}|${e.side}`;
+      (ends.get(k) || ends.set(k, []).get(k)).push({ e, end, w: (end === 'ao' ? e.a : e.b).w, ox: other.x });
+    }
+  }
+  for (const list of ends.values()) {
+    list.sort((p, q) => p.ox - q.ox);
+    const step = Math.min(18, (list[0].w * 0.6) / Math.max(1, list.length - 1));
+    list.forEach((p, k) => { p.e[p.end] = (k - (list.length - 1) / 2) * step; });
+  }
+  const out = new Map();
+  for (const e of back) {
+    const { a, b, side } = e;
+    const lo = b.x; const hi = a.x + a.w;
+    const top = side === 'top';
+    let y = top ? Math.min(a.y, b.y) - BACK_GAP : Math.max(a.y + a.h, b.y + b.h) + BACK_GAP;
+    while (used.some((u) => u.lo < hi && lo < u.hi && Math.abs(u.y - y) < BACK_LANE)) y += top ? -BACK_LANE : BACK_LANE;
+    used.push({ lo, hi, y });
+    let points = loopPoints(a, b, side, y, e.ao, e.bo);
+    if (direction === 'tb') points = points.map(([x, yy]) => [yy, x]);
+    out.set(e.i, points);
+  }
+  return out;
+}
+
+function routeFor(t, rects, offset, backPoints) {
   const a = rects.get(t.from); const b = rects.get(t.to);
-  if (!a || !b) return { edge: '', labelSvg: '' };
-  const route = t.from === t.to ? routeSelfLoop(a, offset.from) : routeOrthogonal(a, b, offset);
-  if (t.from !== t.to) route.points = detour(route.points, [...rects.entries()].filter(([id]) => id !== t.from && id !== t.to).map(([, r]) => r));
+  if (!a || !b) return null;
+  if (t.from === t.to) return routeSelfLoop(a, offset.from).points;
+  const points = backPoints || routeOrthogonal(a, b, offset).points;
+  return detour(points, [...rects.entries()].filter(([id]) => id !== t.from && id !== t.to).map(([, r]) => r));
+}
+
+function renderTransition(t, index, points, obstacles) {
+  if (!points) return { edge: '', labelSvg: '' };
+  const route = { points };
   const d = pathFromPoints(route.points, 10);
   const kind = t.kind || 'normal';
   const cls = `edge lc-transition ${kind}${kind === 'auto' || kind === 'timeout' ? ' dashed' : ''}`;
@@ -165,21 +248,27 @@ export function renderLifecycle(spec) {
   const rects = placement.placed;
   const warnings = pinPositions(rects, layout.positions);
   const transitions = spec.transitions || [];
-  const offsets = portOffsets(transitions, rects, 20);
+  const isBackEdge = backRoutes(transitions, rects, direction);
+  const forward = transitions.map((_, i) => i).filter((i) => !isBackEdge.has(i));
+  const offsets = transitions.map(() => ({ from: 0, to: 0 }));
+  const fwdOffsets = portOffsets(forward.map((i) => transitions[i]), rects, 20);
   // Transitions crossing the same gap otherwise all turn at its midpoint, which
   // stacks their labels into one column. Same lane assignment as C4 and ERD.
-  const channels = channelOffsets(transitions, rects, offsets);
-  for (let i = 0; i < transitions.length; i += 1) offsets[i].channel = channels[i];
+  const channels = channelOffsets(forward.map((i) => transitions[i]), rects, fwdOffsets);
+  forward.forEach((i, k) => { offsets[i] = { ...fwdOffsets[k], channel: channels[k] }; });
+  const points = transitions.map((t, i) => (isBackEdge.has(i) ? null : routeFor(t, rects, offsets[i])));
+  const back = backRoutes(transitions, rects, direction, points.filter(Boolean));
+  for (const [i, pts] of back) points[i] = routeFor(transitions[i], rects, offsets[i], pts);
   const obstacles = [...rects.values()].map((r) => ({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 }));
   let body = '';
   let labels = '';
   const size = (t) => (t.label || t.event || '').length + (t.guard || '').length + (t.action || '').length;
   const order = transitions.map((_, i) => i).sort((a, b) => size(transitions[b]) - size(transitions[a]));
-  for (const i of order) { const r = renderTransition(transitions[i], i, rects, offsets[i], obstacles); body += r.edge; labels += r.labelSvg; }
+  for (const i of order) { const r = renderTransition(transitions[i], i, points[i], obstacles); body += r.edge; labels += r.labelSvg; }
   for (const s of spec.states) body += renderState(s, rects.get(s.id), direction);
   body += labels;
 
-  const extent = bbox([...rects.values()], 0);
+  const extent = bbox([...rects.values(), ...points.filter(Boolean).flat().map(([x, y]) => ({ x, y, w: 0, h: 0 }))], 0);
   const width = extent.x + extent.w + MARGIN + 60;
   const height = extent.y + extent.h + MARGIN + 20;
   const theme = spec.meta.theme === 'dark' ? 'dark' : 'light';
