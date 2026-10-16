@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.8.0] - 2026-10-16
+
 ### Added
 - **Sequence diagrams.** A new `sequence` type draws one flow end to end: participants, numbered messages (sync, async, reply), activation bars, notes, and `alt`/`opt`/`loop`/`par`/`break` fragments. Exports to Mermaid `sequenceDiagram`, shows in the dashboard as Flows, and the `sequence.messages` docs generator writes one sentence per step. Example: `examples/checkout.sequence.json`.
 - **`vibex workspace`: one site for several repos.** Run it from the folder above them. It finds each repo's specs and builds a landing page plus one dashboard per repo. Specs can live inside each repo or in a shared folder.
