@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sequence.schema.json",
+  "title": "vibeX sequence diagram",
+  "type": "object",
+  "required": ["schema_version", "diagram_type", "meta", "participants", "steps"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "diagram_type": { "const": "sequence" },
+    "meta": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/meta" }],
+      "properties": {
+        "trigger": { "type": "string", "description": "What starts this flow, one line: the buyer pays for an order" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "numbered": { "type": "boolean", "default": true, "description": "Prefix each message with its step number" },
+        "gapX": { "type": "number", "minimum": 0, "description": "Minimum space between lifelines" }
+      }
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Left to right in the order given. Put the caller first.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id", "description": "Reuse the C4 element id when the participant is drawn there" },
+          "label": { "type": "string" },
+          "kind": { "enum": ["person", "service", "database", "queue", "external"], "default": "service" },
+          "description": { "type": "string" },
+          "technology": { "type": "string" },
+          "sources": { "$ref": "common.schema.json#/$defs/sources" }
+        }
+      }
+    },
+    "steps": { "$ref": "#/$defs/steps" },
+    "cards": { "$ref": "common.schema.json#/$defs/cards" }
+  },
+  "$defs": {
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "oneOf": [{ "$ref": "#/$defs/message" }, { "$ref": "#/$defs/note" }, { "$ref": "#/$defs/fragment" }] }
+    },
+    "message": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "from": { "$ref": "common.schema.json#/$defs/id" },
+        "to": { "$ref": "common.schema.json#/$defs/id", "description": "Same as from for a call to itself" },
+        "label": { "type": "string", "description": "What is sent: POST /orders, OrderPlaced, 201 Created" },
+        "detail": { "type": "string", "description": "Second, smaller line: payload, condition, technology" },
+        "kind": { "enum": ["sync", "async", "reply"], "default": "sync", "description": "sync = waits for an answer (filled arrow, opens an activation bar); async = fire and forget (open arrow); reply = the answer (dashed, closes the bar)" },
+        "failure": { "type": "boolean", "description": "An error path: drawn red" },
+        "sources": { "$ref": "common.schema.json#/$defs/sources" }
+      }
+    },
+    "note": {
+      "type": "object",
+      "required": ["note", "over"],
+      "properties": {
+        "note": { "type": "string" },
+        "over": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" }, "minItems": 1, "maxItems": 2, "description": "One participant (note sits beside it) or two (note spans them)" }
+      }
+    },
+    "fragment": {
+      "type": "object",
+      "required": ["fragment", "steps"],
+      "properties": {
+        "fragment": { "enum": ["alt", "opt", "loop", "par", "break"], "description": "alt = one of several branches; opt = only if; loop = repeated; par = at the same time; break = stops the flow" },
+        "label": { "type": "string", "description": "The condition, without brackets: card accepted, for each item" },
+        "steps": { "$ref": "#/$defs/steps" },
+        "else": {
+          "type": "array",
+          "description": "Further branches of an alt or par",
+          "items": { "type": "object", "required": ["steps"], "properties": { "label": { "type": "string" }, "steps": { "$ref": "#/$defs/steps" } } }
+        }
+      }
+    }
+  }
+}

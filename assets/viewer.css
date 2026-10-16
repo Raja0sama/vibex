@@ -74,6 +74,7 @@ html[data-theme="dark"] .i-moon{display:none}
 .type-badge.c4{color:var(--system);background:color-mix(in srgb,var(--system) 12%,transparent);border-color:color-mix(in srgb,var(--system) 25%,transparent)}
 .type-badge.endpoints{color:var(--get);background:color-mix(in srgb,var(--get) 12%,transparent);border-color:color-mix(in srgb,var(--get) 25%,transparent)}
 .type-badge.lifecycle{color:var(--patch);background:color-mix(in srgb,var(--patch) 12%,transparent);border-color:color-mix(in srgb,var(--patch) 25%,transparent)}
+.type-badge.sequence{color:var(--event);background:color-mix(in srgb,var(--event) 12%,transparent);border-color:color-mix(in srgb,var(--event) 25%,transparent)}
 
 /* ---------- viewer shell ---------- */
 .viewer{display:flex;flex-direction:column;min-height:0;height:100%}

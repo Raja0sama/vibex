@@ -71,19 +71,22 @@
   function toggleTheme() { setTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
   setTheme(initialTheme());
 
-  var SINGULAR = { entities: 'entity', elements: 'element', endpoints: 'endpoint', types: 'type', groups: 'group', boundaries: 'boundary', states: 'state', relationships: 'relationship', transitions: 'transition' };
-  var COLLECTIONS = ['entities', 'elements', 'endpoints', 'types', 'groups', 'boundaries', 'states'];
-  var SKIP = { id: 1, row: 1, col: 1, name: 1, label: 1, description: 1, summary: 1, sources: 1, columns: 1, fields: 1, params: 1, values: 1, contains: 1, entities: 1, tags: 1, path: 1, method: 1, synthetic: 1 };
-  var PLURAL = { entities: 'entities', elements: 'elements', endpoints: 'endpoints', types: 'types', groups: 'groups', boundaries: 'boundaries', states: 'states' };
-  function relsOf(spec) { return spec.relationships || spec.transitions || []; }
+  var SINGULAR = { entities: 'entity', elements: 'element', endpoints: 'endpoint', types: 'type', groups: 'group', boundaries: 'boundary', states: 'state', participants: 'participant', relationships: 'relationship', transitions: 'transition', messages: 'message' };
+  var COLLECTIONS = ['entities', 'elements', 'endpoints', 'types', 'groups', 'boundaries', 'states', 'participants'];
+  var SKIP = { id: 1, row: 1, col: 1, name: 1, label: 1, description: 1, summary: 1, sources: 1, columns: 1, fields: 1, params: 1, values: 1, contains: 1, entities: 1, tags: 1, path: 1, method: 1, synthetic: 1, steps: 1, messages: 1 };
+  var PLURAL = { entities: 'entities', elements: 'elements', endpoints: 'endpoints', types: 'types', groups: 'groups', boundaries: 'boundaries', states: 'states', participants: 'participants' };
+  function relsOf(spec) { return spec.relationships || spec.transitions || spec.messages || []; }
+  var REL = { lifecycle: ['transition', 'transitions'], sequence: ['message', 'messages'] };
+  // Step order is the layout: moving a lifeline would only break it.
+  var FIXED_LAYOUT = { sequence: 1 };
   function statsLine(spec) {
     var parts = [];
-    ['entities', 'elements', 'endpoints', 'groups', 'types', 'boundaries', 'states'].forEach(function (c) {
+    ['entities', 'elements', 'endpoints', 'groups', 'types', 'boundaries', 'states', 'participants'].forEach(function (c) {
       var n = (spec[c] || []).filter(function (x) { return !x.synthetic; }).length;
       if (n) parts.push(n + ' ' + (n === 1 ? SINGULAR[c] : PLURAL[c]));
     });
     var rels = relsOf(spec).length;
-    var relWord = spec.diagram_type === 'lifecycle' ? 'transition' : 'relationship';
+    var relWord = (REL[spec.diagram_type] || ['relationship'])[0];
     if (rels || spec.diagram_type !== 'endpoints') parts.push(rels + ' ' + relWord + (rels === 1 ? '' : 's'));
     return parts.join(' · ');
   }
@@ -196,7 +199,7 @@
     // First collection wins, so a group can never shadow an entity with the same id.
     COLLECTIONS.forEach(function (c) { (spec[c] || []).forEach(function (item) { if (item && item.id != null && !index[item.id]) index[item.id] = { collection: c, item: item }; }); });
     var rels = relsOf(spec);
-    var relCollection = spec.diagram_type === 'lifecycle' ? 'transitions' : 'relationships';
+    var relCollection = (REL[spec.diagram_type] || [0, 'relationships'])[1];
     var relIndex = {};
     rels.forEach(function (r, i) { relIndex[r.id || (r.from + '-' + r.to + '-' + i)] = r; });
     var defaultGroup = (spec.groups || []).filter(function (g) { return g.synthetic; })[0];
@@ -207,6 +210,7 @@
     if (stats) stats.textContent = statsLine(spec);
     var hint = canvas && canvas.querySelector('.hint');
     if (hint && coarse) hint.textContent = 'drag a box to move it · drag space to pan · pinch to zoom · tap a node';
+    if (hint && FIXED_LAYOUT[spec.diagram_type]) hint.textContent = (coarse ? 'drag to pan · pinch to zoom · tap' : 'drag to pan · wheel to zoom · click') + ' a participant or message';
 
     // ---------- pan / zoom ----------
     var vb0 = svg.getAttribute('viewBox').split(/\s+/).map(Number);
@@ -256,6 +260,7 @@
     var edgeCache = {};
     var resetBtn = root.querySelector('[data-role=reset-layout]');
     var saveBtn = root.querySelector('[data-role=save-layout]');
+    if (FIXED_LAYOUT[spec.diagram_type]) [resetBtn, saveBtn].forEach(function (btn) { if (btn) btn.hidden = true; });
     function isContainer(el) { var k = el.getAttribute('data-node-kind'); return k === 'boundary' || k === 'group'; }
     function boxOf(id) {
       if (boxes[id]) return boxes[id];
@@ -430,7 +435,7 @@
       if (e.button !== 0) return;
       drag = { x: e.clientX, y: e.clientY, vb: vb.slice(), moved: false, target: e.target };
       var node = e.target.closest && e.target.closest('[data-node-id]');
-      if (node && svg.contains(node)) {
+      if (node && svg.contains(node) && !FIXED_LAYOUT[spec.diagram_type]) {
         drag.ids = dragSet(node);
         drag.from = drag.ids.map(offsetOf);
       }

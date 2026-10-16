@@ -98,6 +98,28 @@ marker.arrow path{fill:var(--edge)}
 .type-card rect.box{fill:var(--surface);stroke:var(--border);stroke-width:1.2;rx:8}
 .type-card .head{fill:var(--surface-2)}
 .watermark{fill:var(--text-3);font-size:9px}
+.sq-part rect.box,.sq-part .box-shape{fill:var(--container);stroke:none}
+.sq-part.person rect.box{fill:var(--person)}
+.sq-part.database .box-shape{fill:var(--database)}
+.sq-part.queue rect.box{fill:var(--queue)}
+.sq-part.external rect.box{fill:var(--external)}
+.sq-part .title{fill:#fff;font-size:13px;font-weight:650}
+.sq-part .sub{fill:rgba(255,255,255,.8);font-size:10px;letter-spacing:.02em}
+.sq-part .db-line{stroke:rgba(255,255,255,.45);fill:none;stroke-width:1.2}
+.sq-foot{opacity:.85}
+.sq-lifeline{stroke:var(--edge-soft);stroke-width:1.2;stroke-dasharray:5 5;fill:none}
+.sq-bar{fill:var(--surface);stroke:var(--edge);stroke-width:1.1}
+.sq-msg.failure path.line{stroke:var(--lc-failure)}
+.sq-msg.failure .label{fill:var(--lc-failure)}
+.sq-note .note-box{fill:var(--lc-waiting-bg);stroke:var(--lc-waiting);stroke-width:1}
+.sq-note .note-text{fill:var(--text);font-size:11px}
+.sq-frag rect.frame{fill:none;stroke:var(--boundary);stroke-width:1.2}
+.sq-frag .tab{fill:var(--surface-2);stroke:var(--boundary);stroke-width:1.2}
+.sq-frag .tag{fill:var(--text);font-size:10.5px;font-weight:700;font-family:var(--font-mono)}
+.sq-frag .cond{fill:var(--text-2);font-size:11px;font-style:italic}
+.sq-frag .cond-bg{fill:var(--bg);fill-opacity:.92}
+.sq-frag .divider{stroke:var(--boundary);stroke-width:1.1;stroke-dasharray:6 4}
+.sq-frag.break rect.frame,.sq-frag.break .tab{stroke:var(--lc-failure)}
 .proposed-stamp text{fill:var(--c-proposed);font-size:12px;font-weight:700;letter-spacing:.12em;opacity:.65}
 `;
 
@@ -105,6 +127,8 @@ export const MARKERS = `
 <filter id="m-shadow" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0b1220" flood-opacity="0.10"/></filter>
 <marker id="m-arrow" class="arrow" viewBox="0 0 12 12" refX="10.5" refY="6" markerWidth="13" markerHeight="13" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1 1 L11 6 L1 11 Z"/></marker>
 <marker id="m-arrow-failure" class="arrow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1 1 L11 6 L1 11 Z" style="fill:var(--lc-failure);stroke:var(--lc-failure)"/></marker>
+<marker id="m-open" viewBox="0 0 12 12" refX="10.5" refY="6" markerWidth="13" markerHeight="13" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1 1 L11 6 L1 11"/></marker>
+<marker id="m-open-failure" viewBox="0 0 12 12" refX="10.5" refY="6" markerWidth="13" markerHeight="13" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1 1 L11 6 L1 11" style="stroke:var(--lc-failure)"/></marker>
 <marker id="m-one" viewBox="0 0 24 20" refX="24" refY="10" markerWidth="24" markerHeight="20" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><line x1="0" y1="10" x2="24" y2="10"/><line x1="14" y1="3" x2="14" y2="17"/></marker>
 <marker id="m-zero-or-one" viewBox="0 0 24 20" refX="24" refY="10" markerWidth="24" markerHeight="20" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><line x1="0" y1="10" x2="24" y2="10"/><circle cx="7" cy="10" r="3.5" style="fill:var(--label-bg)"/><line x1="16" y1="3" x2="16" y2="17"/></marker>
 <marker id="m-many" viewBox="0 0 24 20" refX="24" refY="10" markerWidth="24" markerHeight="20" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><line x1="0" y1="10" x2="12" y2="10"/><circle cx="7" cy="10" r="3.5" style="fill:var(--label-bg)"/><path d="M12 10 L24 2 M12 10 L24 10 M12 10 L24 18"/></marker>

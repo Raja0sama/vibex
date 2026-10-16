@@ -2,6 +2,7 @@
 // GitHub and GitLab Markdown, Notion, Confluence, most wikis. It is a second
 // drawing of the spec, not a round trip: edit the spec, never the .mmd.
 import { linksToC4 } from '../links/render-links.mjs';
+import { isMessage, isNote, isFragment, branchesOf } from '../sequence/steps.mjs';
 
 // Inside a quoted label: quotes and angle brackets become Mermaid entity codes,
 // newlines become spaces.
@@ -131,6 +132,41 @@ function lifecycle(spec) {
   return out.join('\n');
 }
 
+// ---------- sequence ----------
+const ARROW = { sync: '->>', async: '-)', reply: '-->>' };
+const FRAGMENT_ELSE = { alt: 'else', par: 'and' };
+// Message text runs to the end of the line; `;` and `#` would end or escape it.
+const msgText = (s) => plain(s).replace(/;/g, ',').replace(/#/g, 'no.');
+
+function sequence(spec) {
+  const out = header(spec, 'sequenceDiagram');
+  if (spec.layout?.numbered !== false) out.push('  autonumber');
+  const id = idMaker();
+  for (const p of spec.participants) out.push(`  ${p.kind === 'person' ? 'actor' : 'participant'} ${id(p.id)} as ${msgText(p.label || p.id)}`);
+  const walk = (steps, depth) => {
+    const pad = '  '.repeat(depth);
+    for (const s of steps || []) {
+      if (isFragment(s)) {
+        const branches = branchesOf(s);
+        out.push(`${pad}${s.fragment}${s.label ? ` ${msgText(s.label)}` : ''}`);
+        branches.forEach((b, k) => {
+          if (k) out.push(`${pad}${FRAGMENT_ELSE[s.fragment] || 'else'}${b?.label ? ` ${msgText(b.label)}` : ''}`);
+          walk(b?.steps, depth + 1);
+        });
+        out.push(`${pad}end`);
+      } else if (isNote(s)) {
+        const over = (s.over || []).map(id);
+        out.push(`${pad}Note ${over.length === 2 ? `over ${over.join(',')}` : `right of ${over[0]}`}: ${msgText(s.note)}`);
+      } else if (isMessage(s)) {
+        const text = [s.label, s.detail && `(${s.detail})`].filter(Boolean).join(' ');
+        out.push(`${pad}${id(s.from)}${ARROW[s.kind] || ARROW.sync}${id(s.to)}: ${msgText(text)}`);
+      }
+    }
+  };
+  walk(spec.steps, 1);
+  return out.join('\n');
+}
+
 // ---------- endpoints ----------
 // Mermaid has no API catalogue, so each group is a box of its routes.
 function endpoints(spec) {
@@ -169,7 +205,7 @@ function endpoints(spec) {
   return out.join('\n');
 }
 
-const BY_TYPE = { erd, c4, lifecycle, endpoints, links: (spec) => c4({ ...linksToC4(spec), diagram_type: 'links' }) };
+const BY_TYPE = { erd, c4, lifecycle, sequence, endpoints, links: (spec) => c4({ ...linksToC4(spec), diagram_type: 'links' }) };
 
 export const MERMAID_TYPES = Object.keys(BY_TYPE);
 

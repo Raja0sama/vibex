@@ -4,7 +4,11 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- **Sequence diagrams.** A new `sequence` type draws one flow end to end: participants, numbered messages (sync, async, reply), activation bars, notes, and `alt`/`opt`/`loop`/`par`/`break` fragments. Exports to Mermaid `sequenceDiagram`, shows in the dashboard as Flows, and the `sequence.messages` docs generator writes one sentence per step. Example: `examples/checkout.sequence.json`.
+
+### Changed
+- **Busy lifecycle diagrams are easier to read.** States in a column are ordered to cut crossings, and transitions that go back a step loop over or under the boxes instead of piling onto one side.
 
 ## [0.7.2] - 2026-10-06
 

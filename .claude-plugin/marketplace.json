@@ -6,7 +6,7 @@
     {
       "name": "vibex",
       "source": "./",
-      "description": "ERD, C4, API endpoint, lifecycle and service-links diagrams from your code, plus documentation that fails CI when the code moves.",
+      "description": "ERD, C4, API endpoint, lifecycle, sequence and service-links diagrams from your code, plus documentation that fails CI when the code moves.",
       "category": "documentation"
     }
   ]

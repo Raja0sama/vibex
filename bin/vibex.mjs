@@ -20,7 +20,7 @@ import { toMermaid } from '../renderers/mermaid/to-mermaid.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const HELP = `vibeX — you vibed it into existence; this shows you what you built
-        JSON spec → standalone HTML diagram (ERD, C4, API endpoints, lifecycle)
+        JSON spec → standalone HTML diagram (ERD, C4, API endpoints, lifecycle, sequence)
 
 Usage:
   vibex validate <spec.json> [--json]
@@ -490,7 +490,7 @@ function cmdMermaid(args) {
   const report = validateSpec(spec);
   if (!report.ok) { console.error(formatReport(report)); process.exit(1); }
   const text = toMermaid(spec);
-  if (!text) fail(`${spec.diagram_type} has no Mermaid form; diagrams do: erd, c4, endpoints, lifecycle, links`);
+  if (!text) fail(`${spec.diagram_type} has no Mermaid form; diagrams do: erd, c4, endpoints, lifecycle, sequence, links`);
   if (out) { writeOut(path.resolve(out), text); console.log(path.resolve(out)); } else process.stdout.write(text);
 }
 

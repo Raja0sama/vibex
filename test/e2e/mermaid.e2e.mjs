@@ -18,7 +18,7 @@ try { ({ chromium } = await import('playwright-core')); } catch { /* skipped bel
 const skip = chromium ? false : 'playwright-core is not installed (npm i --no-save playwright-core)';
 const mermaidJs = process.env.VIBEX_MERMAID;
 
-const NAMES = ['orders.erd', 'shop.c4', 'order.lifecycle', 'shop.endpoints', 'shop.links'];
+const NAMES = ['orders.erd', 'shop.c4', 'order.lifecycle', 'checkout.sequence', 'shop.endpoints', 'shop.links'];
 const out = fs.mkdtempSync(path.join(os.tmpdir(), 'vibex-mermaid-'));
 const url = {};
 for (const linked of [false, true]) {

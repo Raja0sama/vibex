@@ -1,7 +1,7 @@
 {
   "name": "@vibex/vibex",
   "version": "0.7.2",
-  "description": "Architecture diagrams and checkable documentation from your codebase: ERD, C4, API endpoints and lifecycle diagrams, plus a fact graph whose claims fail CI when the code moves. Imports OpenAPI, GraphQL SDL and Prisma. One standalone HTML file, zero dependencies, no server.",
+  "description": "Architecture diagrams and checkable documentation from your codebase: ERD, C4, API endpoints, lifecycle and sequence diagrams, plus a fact graph whose claims fail CI when the code moves. Imports OpenAPI, GraphQL SDL and Prisma. One standalone HTML file, zero dependencies, no server.",
   "keywords": [
     "diagram",
     "erd",
@@ -19,6 +19,7 @@
     "documentation",
     "changelog",
     "lifecycle",
+    "sequence-diagram",
     "c4-model",
     "diagrams-as-code"
   ],

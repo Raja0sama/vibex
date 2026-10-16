@@ -54,7 +54,7 @@ npx @vibex/vibex demo out                                      # or look first: 
 The mark is the same idea: two edges crossing. Everything interesting in a system is a
 line between two things, not the things themselves.
 
-## Five diagrams. One source of truth.
+## Six diagrams. One source of truth.
 
 | | Type | What it draws | Import from |
 |---|---|---|---|
@@ -62,6 +62,7 @@ line between two things, not the things themselves.
 | 🟣 | `c4` | persons, systems, containers, components, databases, queues, each with its own fill, inside tinted nested boundaries | hand-authored |
 | 🟢 | `endpoints` | REST routes, GraphQL operations, published events — grouped by resource, with method badges, auth, params, status codes | OpenAPI 2/3, GraphQL SDL |
 | 🟡 | `lifecycle` | every state a thing can reach and every legal move between them, with actor, event, guard and side effect on each arrow | hand-authored |
+| 🟠 | `sequence` | one request or job end to end: who calls whom, in order, with replies, async events, activation bars and `alt`/`opt`/`loop`/`par` branches | hand-authored |
 | 🔷 | `links` | the **System view**: every call between services, pinned to the client that makes it and the handler that serves it, across repositories | hand-authored from clients and handlers |
 
 Each is a validated JSON spec plus a rendered viewer. **The spec is the artifact you keep;

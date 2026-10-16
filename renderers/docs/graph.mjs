@@ -34,6 +34,10 @@ const SHAPES = {
     nodes: (s) => (s.states || []).map((st) => ({ id: st.id, label: st.label || st.id, kind: st.kind || 'normal', sources: st.sources })),
     edges: (s) => (s.transitions || []).map((t) => ({ from: t.from, to: t.to, relation: 'transitions-to', reverse: 'entered-from', label: t.event || t.label })),
   },
+  sequence: {
+    nodes: (s) => (s.participants || []).map((p) => ({ id: p.id, label: p.label || p.id, kind: p.kind || 'service', sources: p.sources })),
+    edges: (s) => messagesOf(s.steps).filter((m) => m.from !== m.to).map((m) => ({ from: m.from, to: m.to, relation: 'sends-to', reverse: 'receives-from', label: m.label })),
+  },
 };
 
 export function specId(spec, fallback) {

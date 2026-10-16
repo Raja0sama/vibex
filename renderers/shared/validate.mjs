@@ -4,6 +4,7 @@
 // human-readable contract.
 
 import { isWhitespaceSignificant } from '../docs/hash-mode.mjs';
+import { isMessage, isNote, isFragment, branchesOf } from '../sequence/steps.mjs';
 
 const ID_RE = /^[a-zA-Z][a-zA-Z0-9_.-]*$/;
 
@@ -30,6 +31,11 @@ export const ENUMS = {
     stateKind: ['initial', 'normal', 'waiting', 'terminal', 'failure'],
     transitionKind: ['normal', 'auto', 'timeout', 'failure'],
   },
+  sequence: {
+    participantKind: ['person', 'service', 'database', 'queue', 'external'],
+    messageKind: ['sync', 'async', 'reply'],
+    fragment: ['alt', 'opt', 'loop', 'par', 'break'],
+  },
   docs: {
     sourceKind: ['anchored', 'asserted'],
     hashMode: ['exact', 'loose'],
@@ -38,6 +44,7 @@ export const ENUMS = {
       'c4.elements', 'c4.relationships', 'c4.boundaries',
       'endpoints.operations', 'endpoints.types',
       'lifecycle.states', 'lifecycle.transitions',
+      'sequence.messages',
       'coverage',
     ],
   },
@@ -486,6 +493,70 @@ export function validateLifecycle(spec, report = new Report()) {
   return report;
 }
 
+export function validateSequence(spec, report = new Report()) {
+  checkCommon(report, spec);
+  if (isObj(spec.meta) && spec.meta.trigger !== undefined && typeof spec.meta.trigger !== 'string') report.error('type', 'meta.trigger must be a string', 'meta.trigger');
+  checkLayout(report, spec.layout, { numbered: 'boolean', gapX: 'number' });
+  if (!Array.isArray(spec.participants) || !spec.participants.length) { report.error('missing', 'participants must be a non-empty array', 'participants'); return report; }
+  const ids = checkIds(report, spec.participants, 'participants');
+  spec.participants.forEach((p, i) => {
+    const at = `participants[${i}]`;
+    if (!isObj(p)) { report.error('type', `${at} must be an object`, at); return; }
+    if (typeof p.label !== 'string' || !p.label) report.error('missing', `${at}.label is required`, at);
+    checkEnum(report, p.kind, ENUMS.sequence.participantKind, `${at}.kind`);
+    checkSources(report, p.sources, `${at}.sources`);
+  });
+  const used = new Set();
+  const msgIds = new Set();
+  let count = 0;
+  const ref = (id, at) => {
+    if (!ids.has(id)) { report.error('dangling-ref', `${at} "${id}" is not a participant id${listIds(ids)}`, at); return false; }
+    used.add(id);
+    return true;
+  };
+  const walk = (steps, at) => {
+    if (!Array.isArray(steps) || !steps.length) { report.error('missing', `${at} must be a non-empty array`, at); return; }
+    steps.forEach((s, i) => {
+      const where = `${at}[${i}]`;
+      if (isFragment(s)) {
+        checkEnum(report, s.fragment, ENUMS.sequence.fragment, `${where}.fragment`, false);
+        if (s.else !== undefined) {
+          if (!Array.isArray(s.else)) report.error('type', `${where}.else must be an array`, where);
+          else if (s.fragment !== 'alt' && s.fragment !== 'par') report.warn('else', `${where} is "${s.fragment}"; only alt and par have else branches`, where);
+        }
+        if (!s.label && s.fragment !== 'par') report.warn('fragment-label', `${where} (${s.fragment}) has no label; say the condition`, where);
+        branchesOf(s).forEach((b, k) => {
+          if (!isObj(b)) { report.error('type', `${where}.else[${k - 1}] must be an object`, where); return; }
+          walk(b.steps, k ? `${where}.else[${k - 1}].steps` : `${where}.steps`);
+        });
+      } else if (isNote(s)) {
+        if (typeof s.note !== 'string' || !s.note) report.error('missing', `${where}.note must be text`, where);
+        if (!Array.isArray(s.over) || s.over.length < 1 || s.over.length > 2) report.error('type', `${where}.over must list one or two participant ids`, where);
+        else s.over.forEach((p) => ref(p, `${where}.over`));
+      } else if (isMessage(s)) {
+        count += 1;
+        ref(s.from, `${where}.from`);
+        ref(s.to, `${where}.to`);
+        checkEnum(report, s.kind, ENUMS.sequence.messageKind, `${where}.kind`);
+        if (s.id !== undefined) {
+          if (!ID_RE.test(String(s.id))) report.error('id', `${where}.id is invalid`, where);
+          else if (msgIds.has(s.id)) report.error('duplicate-id', `${where}.id "${s.id}" duplicated`, where);
+          msgIds.add(s.id);
+        }
+        if (!s.label) report.warn('label', `${where} (${s.from} -> ${s.to}) has no label; say what is sent`, where);
+        checkSources(report, s.sources, `${where}.sources`);
+      } else {
+        report.error('type', `${where} must be a message (from, to), a note (note, over) or a fragment (fragment, steps)`, where);
+      }
+    });
+  };
+  walk(spec.steps, 'steps');
+  for (const id of ids) if (!used.has(id) && count) report.warn('unused', `participant "${id}" sends and receives nothing`, 'participants');
+  if (count > 40) report.warn('size', `${count} messages; split the flow at a natural hand-off`, 'steps');
+  if (spec.participants.length > 10) report.warn('size', `${spec.participants.length} participants; group the minor ones or split the flow`, 'participants');
+  return report;
+}
+
 const REF_RE = /^[a-zA-Z][a-zA-Z0-9_.-]*(#[a-zA-Z][a-zA-Z0-9_.-]*)?$/;
 const HASH_RE = /^[0-9a-f]{12}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -707,10 +778,10 @@ function validateLinks(spec, report) {
   return report;
 }
 
-const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, docs: validateDocs, links: validateLinks };
+const VALIDATORS = { erd: validateErd, c4: validateC4, endpoints: validateEndpoints, lifecycle: validateLifecycle, sequence: validateSequence, docs: validateDocs, links: validateLinks };
 
 // Types that render to a diagram. `docs` is a spec but not a diagram.
-export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle', 'links'];
+export const DIAGRAM_TYPES = ['erd', 'c4', 'endpoints', 'lifecycle', 'sequence', 'links'];
 export const SPEC_TYPES = Object.keys(VALIDATORS);
 
 export function validateSpec(spec) {
