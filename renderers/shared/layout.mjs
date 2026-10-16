@@ -104,6 +104,64 @@ export function rowsPlace(rows, { gapX = 80, gapY = 90, originX = 0, originY = 0
   return { placed, width: totalWidth, height: Math.max(0, y - gapY - originY) };
 }
 
+// Positions are centred per rank, matching rowsPlace, so a 2-item rank lines
+// up with the middle of a 5-item one.
+function rankSlots(rows) {
+  const slot = new Map();
+  rows.forEach((row, r) => row.forEach((item, i) => slot.set(item.id, { r, p: i - (row.length - 1) / 2 })));
+  return slot;
+}
+
+function crossings(rows, edges) {
+  const slot = rankSlots(rows);
+  const segs = [];
+  for (const [a, b] of edges) {
+    const s = slot.get(a); const t = slot.get(b);
+    if (s && t && s.r !== t.r) segs.push(s.r < t.r ? [s, t] : [t, s]);
+  }
+  let n = 0;
+  for (let i = 0; i < segs.length; i += 1) {
+    for (let j = i + 1; j < segs.length; j += 1) {
+      const [a1, a2] = segs[i]; const [b1, b2] = segs[j];
+      const lo = Math.max(a1.r, b1.r); const hi = Math.min(a2.r, b2.r);
+      if (lo >= hi) continue;
+      const at = (s, e, r) => s.p + (e.p - s.p) * (r - s.r) / (e.r - s.r);
+      if ((at(a1, a2, lo) - at(b1, b2, lo)) * (at(a1, a2, hi) - at(b1, b2, hi)) < 0) n += 1;
+    }
+  }
+  return n;
+}
+
+// Barycenter sweeps: each item moves toward the average position of what it
+// connects to. Rows in `fixed` keep their order (the author pinned them).
+export function orderRanks(rows, edges, { fixed = () => false, sweeps = 8 } = {}) {
+  let best = rows.map((row) => row.slice());
+  let bestCount = crossings(best, edges);
+  let cur = best.map((row) => row.slice());
+  const adj = new Map();
+  for (const [a, b] of edges) {
+    if (a === b) continue;
+    (adj.get(a) || adj.set(a, []).get(a)).push(b);
+    (adj.get(b) || adj.set(b, []).get(b)).push(a);
+  }
+  for (let s = 0; s < sweeps && bestCount > 0; s += 1) {
+    const order = cur.map((_, r) => r);
+    if (s % 2) order.reverse();
+    for (const r of order) {
+      if (fixed(cur[r], r) || cur[r].length < 2) continue;
+      const slot = rankSlots(cur);
+      const key = new Map(cur[r].map((item, i) => {
+        const ps = (adj.get(item.id) || []).map((id) => slot.get(id)).filter((p) => p && p.r !== r).map((p) => p.p);
+        return [item.id, ps.length ? ps.reduce((x, y) => x + y, 0) / ps.length : i - (cur[r].length - 1) / 2];
+      }));
+      cur[r] = cur[r].slice().sort((a, b) => key.get(a.id) - key.get(b.id));
+    }
+    const count = crossings(cur, edges);
+    if (count < bestCount) { best = cur.map((row) => row.slice()); bestCount = count; }
+  }
+  return best;
+}
+
 export function bbox(rects, pad = 0) {
   if (!rects.length) return null;
   const minX = Math.min(...rects.map((r) => r.x)) - pad;
