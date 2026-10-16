@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows Keep a
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.8.1] - 2026-10-16
+
 ### Fixed
 - **Nested sequence fragments are drawn inside each other.** An `alt` inside a `loop` no longer shares the loop's edges.
 
