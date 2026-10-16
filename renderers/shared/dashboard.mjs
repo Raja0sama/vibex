@@ -13,8 +13,8 @@ import { renderChangelogPanel, changelogNavHtml } from '../changelog/render-chan
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DASHBOARD_TEMPLATE_PATH = path.resolve(here, '../../assets/dashboard.html');
 
-const TYPE_LABEL = { links: 'System', erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles', sequence: 'Flows' };
-const TYPE_ORDER = ['links', 'c4', 'erd', 'endpoints', 'lifecycle', 'sequence'];
+export const TYPE_LABEL = { links: 'System', erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles', sequence: 'Flows' };
+export const TYPE_ORDER = ['links', 'c4', 'erd', 'endpoints', 'lifecycle', 'sequence'];
 
 // Headline numbers per diagram type: [value, label] pairs, biggest first.
 function metrics(spec) {

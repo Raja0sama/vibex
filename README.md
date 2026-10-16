@@ -98,6 +98,11 @@ vibex render docs/db.erd.json --open
 
 # every spec in the folder, one page, cross-linked
 vibex dashboard docs/index.html docs --title "Payments platform" --repo .
+
+# several repos side by side? run it from the folder above them:
+# a landing page plus one dashboard per repo, and the files to serve it
+vibex workspace ~/work --title "Payments platform" --host
+cd ~/work/vibex-site && VIBEX_USER=you VIBEX_PASSWORD=change-me docker compose up --build
 ```
 
 No source schema? It reads the code — NestJS controllers, GraphQL resolvers,
@@ -325,7 +330,8 @@ into someone else's SaaS. So vibeX doesn't have a server.
 - PNG export renders through an in-memory blob; it never touches the network
 - Pull the cable out of the wall and it still pans, zooms, searches and exports
 
-Put it on S3 behind SSO, internal nginx, a private Pages site, a Confluence attachment,
+`vibex host <dir>` writes the nginx + Docker files to serve a folder of pages on your own
+box, behind a login that is on by default. Or put it on S3 behind SSO, a private Pages site, a Confluence attachment,
 committed next to the code, or `file://`. **No account to view it. No seats. No expiry.**
 Hand it to a contractor, an auditor, or the new hire on their first morning. It's a file.
 
