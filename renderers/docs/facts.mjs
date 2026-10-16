@@ -9,6 +9,8 @@
 // without guessing, and a generator that guesses produces confident nonsense.
 // Author fragments are introduced with a label and printed verbatim.
 
+import { isMessage, isFragment, branchesOf, messageId } from '../sequence/steps.mjs';
+
 const A = (w) => (/^[aeiou]/i.test(w || '') ? 'an' : 'a');
 const list = (xs) => (xs.length < 2 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -185,6 +187,32 @@ export const GENERATORS = {
         + frag('Triggered by', t.actor) + frag('Only when', t.guard) + frag('Side effect', t.action);
       return claim(id, 'lifecycle.transitions', `tr.${t.id || `${t.from}-${t.to}-${i}`}`, text, `${id}#${t.from}`);
     });
+  },
+
+  // One sentence per message, in step order, carrying the fragment it sits in:
+  // "only when card declined" is the part of a flow people get wrong.
+  'sequence.messages'(spec, id) {
+    const label = new Map((spec.participants || []).map((p) => [p.id, p.label || p.id]));
+    const n = (x) => label.get(x) || x;
+    const CONTEXT = { alt: 'Only when', opt: 'Only when', break: 'Stops the flow when', loop: 'Repeated', par: 'In parallel' };
+    const out = [];
+    const walk = (steps, context) => {
+      for (const s of steps || []) {
+        if (isFragment(s)) {
+          for (const b of branchesOf(s)) walk(b?.steps, [...context, frag(CONTEXT[s.fragment] || 'Within', b?.label)]);
+        } else if (isMessage(s)) {
+          const i = out.length;
+          const verb = s.from === s.to ? `${n(s.from)} does work of its own`
+            : s.kind === 'reply' ? `${n(s.from)} answers ${n(s.to)}`
+              : s.kind === 'async' ? `${n(s.from)} notifies ${n(s.to)} without waiting`
+                : `${n(s.from)} calls ${n(s.to)} and waits for the answer`;
+          const text = `Step ${i + 1}: ${verb}.${frag('Message', s.label)}${frag('Detail', s.detail)}${s.failure ? ' This is a failure path.' : ''}${context.join('')}`;
+          out.push(claim(id, 'sequence.messages', `msg.${messageId(s, i)}`, text, `${id}#${s.from}`));
+        }
+      }
+    };
+    walk(spec.steps, []);
+    return out;
   },
 };
 

@@ -76,6 +76,7 @@
                 "endpoints.types",
                 "lifecycle.states",
                 "lifecycle.transitions",
+                "sequence.messages",
                 "coverage"
               ]
             }

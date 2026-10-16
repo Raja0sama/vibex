@@ -1,6 +1,6 @@
 ---
 name: vibex
-description: 'Diagrams and checkable docs from a codebase. Draws ERDs, C4 context/container/component views, API endpoint catalogues, lifecycle/state machines, and service-to-service call maps as a validated JSON spec plus a standalone HTML viewer, with Mermaid export. Imports OpenAPI, GraphQL SDL and Prisma; otherwise reads the code (NestJS, TypeORM, Express) and writes the spec. Use for: database diagram, ERD, data model, table relationships, C4 or architecture diagram, system context, API map, endpoint list, "show me the endpoints", status flow, state machine, allowed transitions, "what happens after X is approved", how services call each other, microservice map, Mermaid diagram. Also writes documentation as a fact graph: each statement carries its source and a computed confidence, and a drift check fails CI when the code moves. Use to document a system, write architecture or onboarding docs, or explain how a system works.'
+description: 'Diagrams and checkable docs from a codebase. Draws ERDs, C4 context/container/component views, API endpoint catalogues, lifecycle/state machines, sequence diagrams, and service-to-service call maps as a validated JSON spec plus a standalone HTML viewer, with Mermaid export. Imports OpenAPI, GraphQL SDL and Prisma; otherwise reads the code (NestJS, TypeORM, Express) and writes the spec. Use for: database diagram, ERD, data model, table relationships, C4 or architecture diagram, system context, API map, endpoint list, "show me the endpoints", status flow, state machine, allowed transitions, "what happens after X is approved", sequence diagram, request flow, how services call each other, microservice map, Mermaid diagram. Also writes documentation as a fact graph: each statement carries its source and a computed confidence, and a drift check fails CI when the code moves. Use to document a system, write architecture or onboarding docs, or explain how a system works.'
 license: MIT
 metadata:
   version: "0.7.2"
@@ -26,6 +26,7 @@ Skill root: the directory containing this file. Every command below is `node <sk
    | context, containers, components, who talks to what, system boundary | `c4` | `schemas/c4.schema.json` |
    | endpoints, routes, API surface, GraphQL operations, events/topics | `endpoints` | `schemas/endpoints.schema.json` |
    | statuses, state machine, lifecycle, what happens after X, allowed transitions | `lifecycle` | `schemas/lifecycle.schema.json` |
+   | sequence diagram, request flow, what happens when the user clicks X, who calls whom and in what order | `sequence` | `schemas/sequence.schema.json` |
 
 2. **Find a machine-readable source first.** Search the repo before reading code:
    - `endpoints`: `openapi.*`, `swagger.*`, `*.graphql`, `schema.gql`, or a generated schema endpoint dump. Run `import openapi` or `import graphql`.
@@ -113,7 +114,7 @@ This is the main way a good document gets written, and the path the hard rules b
 
 Ask in this order and stop at the first yes.
 
-1. **Can a generator derive it?** Then never write it. Add the generator to a section and the build computes the sentence from the spec, so it can never disagree with the diagram. Available: `erd.entities`, `erd.relationships`, `c4.elements`, `c4.relationships`, `c4.boundaries`, `endpoints.operations`, `endpoints.types`, `lifecycle.states`, `lifecycle.transitions`, `coverage`. Column counts, keys, cardinalities, delete rules, who-calls-what, transitions, guards, operation lists — **all derived. Writing them by hand is the most common way to make this feature worthless.**
+1. **Can a generator derive it?** Then never write it. Add the generator to a section and the build computes the sentence from the spec, so it can never disagree with the diagram. Available: `erd.entities`, `erd.relationships`, `c4.elements`, `c4.relationships`, `c4.boundaries`, `endpoints.operations`, `endpoints.types`, `lifecycle.states`, `lifecycle.transitions`, `sequence.messages`, `coverage`. Column counts, keys, cardinalities, delete rules, who-calls-what, transitions, guards, operation lists — **all derived. Writing them by hand is the most common way to make this feature worthless.**
 2. **Does a specific piece of code prove it?** Write it `anchored`, pointing at that file and symbol. This is where most real documentation lives: invariants, ownership of a write path, what a guard actually enforces.
 3. **Is it a decision only a person can confirm?** Write it `asserted` — and see the hard rule below.
 4. **None of the above?** Leave it out and put the gap in `coverage.out_of_scope` with a reason.
@@ -295,6 +296,7 @@ Report the counts line as it prints, and if claims were **removed**, say so out 
 - ERD: `from` is the FK/child side, `to` is the referenced/parent side. Default `many → one`. Set `to_cardinality: zero-or-one` when the FK column is nullable. Unique FK → `from_cardinality: one` or `zero-or-one`. Use `groups` to frame bounded contexts; the renderer lays each group out as its own block.
 - C4: every element except persons gets a one-sentence `description`. Every relationship gets a verb `label`; add `technology` when it is not obvious. `external: true` for anything the team does not own. One `meta.level` per diagram; drill down with `link` to another rendered HTML.
 - Lifecycle: one `subject` per diagram (`Order.status`, not the whole system). State ids = the enum values in code. Exactly one `kind: initial`; every state either reaches a `terminal` or is explicitly `failure`. Each transition names `event` and `actor`; put conditions in `guard` (no brackets) and side effects in `action`. `kind: auto|timeout` for system-driven moves, `failure` for error paths. Find them in code: status enums, `switch (status)` / state-machine tables, guards like `assertTransition(from, to)`, service methods that set `status =`.
+- Sequence: one flow per diagram, named by its `meta.trigger` ("the buyer pays"), not the whole system. `participants` left to right in the order the call travels, ids reused from C4. Each message names what is sent in `label` (`POST /orders`, `OrderPaid`, `402`); `kind: sync` for calls that wait, `async` for events and queues, `reply` for the answer (it closes the caller's activation bar). Branches go in `fragment: alt` with `else`; `opt` for "only if", `loop` for repeats. Mark error replies `failure: true`. Find them by following one handler: controller → service → client calls, repository writes, `publish`/`emit`, and the response it returns.
 - Endpoints: REST paths use `{param}`. GraphQL `path` is the signature `name(arg: Type!)`. Use `EVENT` for topics, queues, webhooks the service publishes. Put ERD entity IDs in `entities` so the reader can jump from an endpoint to the tables it touches. Do not paste full descriptions into `summary`; one line.
 - `meta.repository: {"url": "https://github.com/org/repo", "revision": "main"}` (web root, no `.git`) plus `sources: [{"path": "src/orders/orders.controller.ts", "line": 42}]` makes the viewer link to `<url>/blob/<revision>/<path>#L<line>`. Works for GitHub and GitLab; omit `revision` to link HEAD. Fill them whenever the diagram came from code.
 - Layout is automatic. Only set `row`/`col` when a layout warning asks for it or the user complains.
@@ -317,7 +319,7 @@ docs <docs.json> <spec.json|dir>... [-o docs.json] [--md doc.md] [--repo dir]
                   --md also writes the document as Markdown. Re-reads only the anchors
                   git says moved since the commit in the lock file.
 mermaid <spec.json> [out.mmd]
-                  the diagram as Mermaid (erDiagram, flowchart, stateDiagram-v2)
+                  the diagram as Mermaid (erDiagram, flowchart, stateDiagram-v2, sequenceDiagram)
 layout <spec.json> <layout.json|-> [--replace] [--clear]
                   write positions saved in the viewer into layout.positions
 links <links.json> [spec dirs...] --repo [name=]dir... [--check] [--reanchor] [--json]

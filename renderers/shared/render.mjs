@@ -4,10 +4,11 @@ import { renderErd } from '../erd/render-erd.mjs';
 import { renderC4 } from '../c4/render-c4.mjs';
 import { renderEndpoints } from '../endpoints/render-endpoints.mjs';
 import { renderLifecycle } from '../lifecycle/render-lifecycle.mjs';
+import { renderSequence } from '../sequence/render-sequence.mjs';
 import { renderLinks } from '../links/render-links.mjs';
 import { toMermaid } from '../mermaid/to-mermaid.mjs';
 
-export const RENDERERS = { erd: renderErd, c4: renderC4, endpoints: renderEndpoints, lifecycle: renderLifecycle, links: renderLinks };
+export const RENDERERS = { erd: renderErd, c4: renderC4, endpoints: renderEndpoints, lifecycle: renderLifecycle, sequence: renderSequence, links: renderLinks };
 
 // The spec the viewer receives. Renderers may add synthetic items (for
 // example the "Other" group for ungrouped endpoints) so every node drawn in

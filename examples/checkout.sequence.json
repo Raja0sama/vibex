@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "id": "checkout.sequence",
+    "title": "Checkout",
+    "subtitle": "From the Pay button to the confirmation email",
+    "trigger": "The customer presses Pay",
+    "repository": { "url": "https://github.com/example/shop-api", "revision": "main" }
+  },
+  "participants": [
+    { "id": "customer", "label": "Customer", "kind": "person" },
+    { "id": "bff", "label": "BFF", "technology": "NestJS", "description": "Session and request shaping for the storefront" },
+    { "id": "order_api", "label": "Order API", "technology": "NestJS" },
+    { "id": "db", "label": "Shop DB", "kind": "database", "technology": "PostgreSQL" },
+    { "id": "stripe", "label": "Stripe", "kind": "external" },
+    { "id": "events", "label": "Domain events", "kind": "queue", "technology": "SQS" },
+    { "id": "worker", "label": "Notification worker" }
+  ],
+  "steps": [
+    { "from": "customer", "to": "bff", "label": "POST /checkout", "detail": "basket id, card token" },
+    { "from": "bff", "to": "bff", "label": "resolve session", "detail": "x-user-id from cookie" },
+    { "from": "bff", "to": "order_api", "label": "POST /orders", "detail": "x-user-id header", "sources": [{ "path": "bff/src/orders/orders.client.ts", "line": 12 }] },
+    { "from": "order_api", "to": "db", "label": "INSERT order (placed)" },
+    { "from": "db", "to": "order_api", "label": "order id", "kind": "reply" },
+    { "from": "order_api", "to": "stripe", "label": "create PaymentIntent", "detail": "idempotency key = order id" },
+    { "from": "stripe", "to": "order_api", "label": "requires_capture", "kind": "reply" },
+    {
+      "fragment": "alt", "label": "card accepted",
+      "steps": [
+        { "from": "order_api", "to": "db", "label": "UPDATE status = paid" },
+        { "from": "db", "to": "order_api", "label": "ok", "kind": "reply" },
+        { "from": "order_api", "to": "events", "label": "OrderPaid", "kind": "async" },
+        { "from": "order_api", "to": "bff", "label": "201 Created", "kind": "reply" }
+      ],
+      "else": [
+        {
+          "label": "card declined",
+          "steps": [
+            { "from": "order_api", "to": "db", "label": "UPDATE status = payment_failed" },
+            { "from": "db", "to": "order_api", "label": "ok", "kind": "reply" },
+            { "from": "order_api", "to": "bff", "label": "402 Payment Required", "kind": "reply", "failure": true }
+          ]
+        }
+      ]
+    },
+    { "from": "bff", "to": "customer", "label": "confirmation page", "kind": "reply" },
+    { "note": "The worker runs on its own schedule; the customer is not waiting for it.", "over": ["events", "worker"] },
+    {
+      "fragment": "opt", "label": "OrderPaid was published",
+      "steps": [
+        { "from": "events", "to": "worker", "label": "OrderPaid", "kind": "async" },
+        { "from": "worker", "to": "worker", "label": "send receipt email", "detail": "SendGrid" }
+      ]
+    }
+  ],
+  "cards": [
+    { "title": "Where these came from", "tone": "info", "items": ["Calls match shop.links.json", "Statuses are the order_status values in order.lifecycle.json"] }
+  ]
+}

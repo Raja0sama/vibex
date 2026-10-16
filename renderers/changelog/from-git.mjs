@@ -98,7 +98,7 @@ export function readCommits(run, from, to = 'HEAD', { includeMerges = false } = 
 }
 
 // A spec file that changed is the part of a release this tool can speak to.
-const SPEC_RE = /(?:^|\/)([A-Za-z0-9_.-]+)\.(erd|c4|endpoints|lifecycle|docs)\.json$/;
+const SPEC_RE = /(?:^|\/)([A-Za-z0-9_.-]+)\.(erd|c4|endpoints|lifecycle|sequence|docs)\.json$/;
 
 export function specsTouched(paths) {
   const out = new Set();

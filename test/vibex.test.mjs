@@ -31,7 +31,7 @@ const json = (p) => JSON.parse(read(p));
 // Examples that render to a diagram. `docs` specs live alongside them but
 // describe the system in claims rather than nodes, so they are checked apart.
 const DIAGRAM_EXAMPLES = fs.readdirSync(path.join(root, 'examples'))
-  .filter((f) => /\.(erd|c4|endpoints|lifecycle)\.json$/.test(f));
+  .filter((f) => /\.(erd|c4|endpoints|lifecycle|sequence)\.json$/.test(f));
 
 for (const name of DIAGRAM_EXAMPLES) {
   test(`example ${name} validates and renders`, () => {
@@ -43,7 +43,7 @@ for (const name of DIAGRAM_EXAMPLES) {
     assert.ok(html.includes('data-node-id='), 'has nodes');
     assert.ok(html.includes('id="vibex-spec"'), 'embeds spec');
     assert.equal(warnings.length, 0, `layout warnings: ${warnings.join('; ')}`);
-    const collection = { erd: 'entities', c4: 'elements', endpoints: 'endpoints', lifecycle: 'states' }[spec.diagram_type];
+    const collection = { erd: 'entities', c4: 'elements', endpoints: 'endpoints', lifecycle: 'states', sequence: 'participants' }[spec.diagram_type];
     for (const item of spec[collection]) assert.ok(html.includes(`data-node-id="${item.id}"`), `node ${item.id} rendered`);
   });
 }
@@ -1483,4 +1483,53 @@ test('release: the changelog has a section for the version being shipped', () =>
   const log = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   assert.match(log, new RegExp(`^## \\[${pkg.replace(/\./g, '\\.')}\\] - \\d{4}-\\d{2}-\\d{2}`, 'm'),
     `CHANGELOG.md has no dated section for ${pkg}`);
+});
+
+const seqSpec = (steps, participants = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]) => ({
+  schema_version: 1, diagram_type: 'sequence', meta: { title: 'x' }, participants, steps,
+});
+
+test('sequence validator: dangling refs and bad shapes are errors; unused participants and stray else are warnings', () => {
+  const bad = validateSpec(seqSpec([
+    { from: 'a', to: 'ghost', label: 'hi' },
+    { note: 'x', over: ['a', 'b', 'a'] },
+    { fragment: 'maybe', label: 'x', steps: [{ from: 'a', to: 'b', label: 'y' }] },
+    { what: 'is this' },
+  ]));
+  const codes = bad.errors.map((e) => e.code);
+  assert.ok(codes.includes('dangling-ref'));
+  assert.ok(codes.includes('enum'));
+  assert.equal(bad.errors.filter((e) => e.code === 'type').length, 2);
+
+  const warn = validateSpec(seqSpec([
+    { fragment: 'loop', label: 'each', steps: [{ from: 'a', to: 'a', label: 'tick' }], else: [{ steps: [{ from: 'a', to: 'a', label: 't' }] }] },
+  ]));
+  assert.deepEqual(warn.errors, []);
+  const w = warn.warnings.map((x) => x.code);
+  assert.ok(w.includes('else'), 'else only belongs on alt and par');
+  assert.ok(w.includes('unused'), 'b never takes part');
+  assert.ok(validateSpec(seqSpec([])).errors.some((e) => e.code === 'missing'));
+});
+
+test('sequence render: numbered messages, a bar per sync call, and each alt branch starts from the calls in flight', () => {
+  const spec = json('examples/checkout.sequence.json');
+  const { html } = renderSpec(spec);
+  assert.match(html, />1\. POST \/checkout</);
+  assert.match(html, /class="edge sq-msg reply failure dashed"/);
+  assert.match(html, /url\(#m-open\)/, 'async and reply use the open arrowhead');
+  const bars = [...html.matchAll(/<rect class="sq-bar" x="([\d.]+)" y="([\d.]+)" width="10" height="([\d.]+)"/g)].map((m) => m.slice(1).map(Number));
+  const divider = Number(/<path class="divider" d="M[\d.]+ ([\d.]+)/.exec(html)[1]);
+  assert.ok(bars.some(([, y]) => Math.abs(y - divider) < 0.01), 'the else branch reopens the call that was in flight at the alt');
+  const embedded = JSON.parse(specBlock(html));
+  assert.equal(embedded.messages.length, 17, 'the viewer gets every message, flat and in order');
+  const plain = renderSpec({ ...spec, layout: { numbered: false } }).html;
+  assert.doesNotMatch(plain, />1\. POST/);
+});
+
+test('sequence docs: each step is one derived sentence that keeps the branch it sits in', () => {
+  const claims = runGenerator('sequence.messages', json('examples/checkout.sequence.json'), 'checkout');
+  assert.equal(claims.length, 17);
+  assert.equal(claims[0].text, 'Step 1: Customer calls BFF and waits for the answer. Message: POST /checkout. Detail: basket id, card token.');
+  const declined = claims.find((c) => c.text.startsWith('Step 14:'));
+  assert.match(declined.text, /BFF.*failure path.*Only when: card declined\.$/);
 });

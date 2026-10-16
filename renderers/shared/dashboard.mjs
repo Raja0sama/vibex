@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { esc } from './utils.mjs';
 import { validateSpec } from './validate.mjs';
 import { RENDERERS, embeddable } from './render.mjs';
+import { messagesOf } from '../sequence/steps.mjs';
 import { renderCards, renderLegend, buildPage, embedJson, TOOLBAR_ACTIONS } from './template.mjs';
 import { buildGraph, specId } from '../docs/graph.mjs';
 import { renderDocsPanel, docsNavHtml } from '../docs/render-docs.mjs';
@@ -12,8 +13,8 @@ import { renderChangelogPanel, changelogNavHtml } from '../changelog/render-chan
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DASHBOARD_TEMPLATE_PATH = path.resolve(here, '../../assets/dashboard.html');
 
-const TYPE_LABEL = { links: 'System', erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles' };
-const TYPE_ORDER = ['links', 'c4', 'erd', 'endpoints', 'lifecycle'];
+const TYPE_LABEL = { links: 'System', erd: 'Data model', c4: 'Architecture', endpoints: 'APIs', lifecycle: 'Lifecycles', sequence: 'Flows' };
+const TYPE_ORDER = ['links', 'c4', 'erd', 'endpoints', 'lifecycle', 'sequence'];
 
 // Headline numbers per diagram type: [value, label] pairs, biggest first.
 function metrics(spec) {
@@ -22,6 +23,7 @@ function metrics(spec) {
     case 'erd': return [[spec.entities.length, 'entities'], [rels, 'relationships'], [(spec.groups || []).length, 'groups']];
     case 'c4': return [[spec.elements.length, 'elements'], [rels, 'relationships'], [(spec.boundaries || []).length, 'boundaries']];
     case 'lifecycle': return [[spec.states.length, 'states'], [(spec.transitions || []).length, 'transitions']];
+    case 'sequence': return [[spec.participants.length, 'participants'], [messagesOf(spec.steps).length, 'messages']];
     case 'links': return [[spec.services.length, 'services'], [spec.links.length, 'calls']];
     case 'endpoints': return [[spec.endpoints.length, 'endpoints'], [(spec.groups || []).length, 'groups'], [(spec.types || []).length, 'types']];
     default: return [];

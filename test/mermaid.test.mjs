@@ -12,7 +12,7 @@ const json = (p) => JSON.parse(fs.readFileSync(path.join(root, p), 'utf8'));
 const cli = (...args) => spawnSync(process.execPath, [path.join(root, 'bin/vibex.mjs'), ...args], { cwd: root, encoding: 'utf8' });
 
 test('mermaid: every diagram type has a Mermaid form, headed by its title', () => {
-  const kinds = { 'orders.erd': 'erDiagram', 'shop.c4': 'flowchart LR', 'order.lifecycle': 'stateDiagram-v2', 'shop.endpoints': 'flowchart LR', 'shop.links': 'flowchart LR' };
+  const kinds = { 'orders.erd': 'erDiagram', 'shop.c4': 'flowchart LR', 'order.lifecycle': 'stateDiagram-v2', 'shop.endpoints': 'flowchart LR', 'shop.links': 'flowchart LR', 'checkout.sequence': 'sequenceDiagram' };
   for (const [file, kind] of Object.entries(kinds)) {
     const spec = json(`examples/${file}.json`);
     const text = toMermaid(spec);
@@ -73,4 +73,15 @@ test('mermaid CLI: prints or writes the text, and render leaves a .mmd beside th
   assert.equal(cli('render', 'examples/orders.erd.json', path.join(dir, 'erd.html')).status, 0);
   assert.equal(fs.readFileSync(path.join(dir, 'erd.mmd'), 'utf8'), toMermaid(json('examples/orders.erd.json')));
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('mermaid: sequence keeps step numbers, arrow kinds, fragments and notes', () => {
+  const text = toMermaid(json('examples/checkout.sequence.json'));
+  assert.match(text, /\n {2}autonumber\n/);
+  assert.match(text, /actor n_customer as Customer/);
+  assert.match(text, /n_customer->>n_bff: POST \/checkout \(basket id, card token\)/);
+  assert.match(text, /n_order_api-\)n_events: OrderPaid/);
+  assert.match(text, /n_db-->>n_order_api: order id/);
+  assert.match(text, /\n {2}alt card accepted\n[\s\S]*\n {2}else card declined\n[\s\S]*?\n {2}end\n/);
+  assert.match(text, /Note over n_events,n_worker: The worker runs on its own schedule, the customer/);
 });
