@@ -1533,3 +1533,15 @@ test('sequence docs: each step is one derived sentence that keeps the branch it 
   const declined = claims.find((c) => c.text.startsWith('Step 14:'));
   assert.match(declined.text, /BFF.*failure path.*Only when: card declined\.$/);
 });
+
+test('sequence render: a fragment inside another sits inside its frame, not on its edges', () => {
+  const spec = {
+    schema_version: 1, diagram_type: 'sequence', meta: { title: 'x' },
+    participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'Participant B' }],
+    steps: [{ fragment: 'loop', label: 'each', steps: [{ fragment: 'alt', label: 'new', steps: [{ from: 'a', to: 'b', label: 'go' }], else: [{ label: 'old', steps: [{ from: 'b', to: 'b', label: 'skip' }] }] }] }],
+  };
+  const { html } = renderSpec(spec);
+  const frames = [...html.matchAll(/<rect class="frame" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => m.slice(1).map(Number));
+  const [inner, outer] = frames;
+  assert.ok(inner[0] > outer[0] && inner[0] + inner[2] < outer[0] + outer[2], `inner ${inner} sits inside outer ${outer}`);
+});

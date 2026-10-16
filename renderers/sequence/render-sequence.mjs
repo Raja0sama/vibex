@@ -205,13 +205,16 @@ export function renderSequence(spec) {
 
   function drawFragment(f) {
     const ids = [...touched(f)].filter((id) => col.has(id));
-    const pad = 20 + 10 * depthBelow(f);
+    // The nesting step is added after the head-width floor, not under it, or a
+    // frame and the one inside it land on the same edge.
+    const nest = 10 * depthBelow(f);
+    const pad = 20 + nest;
     const cols = ids.map((id) => col.get(id));
     const lo = Math.min(...cols); const hi = Math.max(...cols);
     const selfLabel = Math.max(0, ...messagesOf([f]).filter((m) => m.from === m.to && col.get(m.from) === hi)
       .map((m) => linesWidth(messageLines(m, 99)) + SELF_W + 30));
-    const x1 = xs[lo] - Math.max(pad, widths[lo] / 2 - 10);
-    const x2 = xs[hi] + Math.max(pad, selfLabel ? selfLabel + pad : 0, widths[hi] / 2 - 10);
+    const x1 = xs[lo] - Math.max(pad, widths[lo] / 2 - 10 + nest);
+    const x2 = xs[hi] + Math.max(pad, selfLabel ? selfLabel + pad : 0, widths[hi] / 2 - 10 + nest);
     reach(x2);
     const y1 = y;
     const branches = branchesOf(f);
