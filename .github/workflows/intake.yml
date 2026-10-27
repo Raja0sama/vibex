@@ -97,7 +97,7 @@ jobs:
       # drift check to pass — and it opens a pull request, never a merge.
       - name: write it
         if: steps.key.outputs.present == 'true'
-        uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1
+        uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
